@@ -1,0 +1,103 @@
+{
+  "insurance_tool": {
+    "id": "multi_layer_insurance_tool",
+    "title": "多层次保障科普小工具",
+    "subtitle": "从居民医保 → 惠民保 → 商业险，帮你一步步看清自己的保障组合。",
+    "categories": [
+      {
+        "id": "basic_medical",
+        "insurance_type": "居民基本医保",
+        "description": "作用：小病小痛理赔，仅理赔医保清单内项目。局限：保而不包，大病自费压力大。",
+        "image": "./assets/basic-medical.svg",
+        "sub_topics": [
+          {
+            "id": "basic_medical_drug_list",
+            "title": "血液科医保药品目录",
+            "content_type": "drug_list",
+            "introduction": "2025-2026 年血液病相关抗肿瘤药的医保准入情况，仅作患者沟通科普使用。",
+            "rules": [
+              {
+                "category": "白血病相关药物（示例）",
+                "drugs": [
+                  {
+                    "name": "甲磺酸氟马替尼片",
+                    "condition": "Ph+CML 慢性期成人患者",
+                    "valid_from": "2025-01-01",
+                    "valid_to": "2026-12-31"
+                  },
+                  {
+                    "name": "泽布替尼胶囊",
+                    "condition": "MCL/CLL/SLL/WM/FL 等（以医保目录为准）",
+                    "valid_from": "2025-01-01",
+                    "valid_to": "2025-12-31"
+                  }
+                ],
+                "tips": ["具体起付线、报销比例以当地医保政策为准。"]
+              }
+            ]
+          },
+          {
+            "id": "basic_medical_policy",
+            "title": "医保基本要求和报销政策",
+            "content_type": "policy_guide",
+            "sections": [
+              {
+                "header": "什么是医保报销",
+                "text": "个人账户负责日常购药、小额门诊；统筹账户负责住院和大病报销。"
+              },
+              {
+                "header": "报销四个硬性条件",
+                "tips": ["处于正常参保状态", "在定点医疗机构就医", "符合起付线和封顶线要求", "费用在三大目录范围内"]
+              },
+              {
+                "header": "报销公式",
+                "text": "报销金额 = (符合报销范围费用 - 起付线) × 报销比例"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hui_min_bao",
+        "insurance_type": "惠民保",
+        "description": "作用：补充医保报销。亮点：零门槛带病可投。局限：免赔额高，非 100% 赔付。",
+        "image": "./assets/hui-min-bao.svg",
+        "sub_topics": [
+          {
+            "id": "hmb_intro",
+            "title": "惠民保是什么？",
+            "content_type": "text",
+            "text": "政府指导、普惠性质，几乎零门槛（不限年龄职业），价格亲民。"
+          },
+          {
+            "id": "hmb_local_products",
+            "title": "各地惠民保举例",
+            "content_type": "links",
+            "links": [
+              { "name": "上海（沪惠保）", "url": "随申办小程序搜索“沪惠保”" },
+              { "name": "杭州（西湖益联保）", "url": "本地政务/医保公众号内查询" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "commercial_insurance",
+        "insurance_type": "商业保险",
+        "description": "作用：解决大额自费、外购药/院外特药等费用。亮点：保额高、服务全。局限：需健康告知与核保。",
+        "image": "./assets/commercial-insurance.svg",
+        "sub_topics": [
+          {
+            "id": "commercial_dlbcl_recur",
+            "title": "复发险关键信息与咨询",
+            "content_type": "link_card",
+            "insurance_name": "DLBCL 复发险",
+            "condition": "特定复发风险人群",
+            "next_step": "咨询入口",
+            "url": "https://cloud.tk.cn/nprd/djkcms/S2026011201/?fromId=72841&channelCode=999999990004"
+          }
+        ]
+      }
+    ]
+  }
+}
+
