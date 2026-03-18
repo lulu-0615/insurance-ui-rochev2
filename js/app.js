@@ -108,6 +108,10 @@ function initHeroCta() {
     return;
   }
   btn.addEventListener("click", function () {
+    pendingShowModules = true;
+    if (cachedConfig) {
+      renderModules(cachedConfig.insurance_data || []);
+    }
     scrollToId("features");
   });
 }
@@ -296,7 +300,20 @@ function renderModuleCard(mod) {
     btn.appendChild(right);
 
     btn.addEventListener("click", function () {
+      var panel = card.querySelector("[data-branch-panel='1']");
       var all = actions.querySelectorAll(".linkish");
+
+      var isActive = btn.classList.contains("active");
+      if (isActive && panel) {
+        all.forEach(function (x) {
+          x.classList.remove("active");
+        });
+        panel.hidden = true;
+        panel.innerHTML = "";
+        panel.removeAttribute("data-current-branch");
+        return;
+      }
+
       all.forEach(function (x) {
         x.classList.remove("active");
       });
@@ -344,6 +361,7 @@ function renderBranchPanel(card, mod, branch) {
   if (!panel) {
     return;
   }
+  panel.setAttribute("data-current-branch", slugify(branch.title));
   panel.innerHTML = "";
   panel.hidden = false;
 
@@ -596,6 +614,11 @@ function extractUrls(text) {
   return m ? Array.from(new Set(m)) : [];
 }
 
+/** @type {InsuranceConfigRoot | null} */
+var cachedConfig = null;
+/** @type {boolean} */
+var pendingShowModules = false;
+
 /**
  * 渲染三级标题手风琴（sub_branches）
  * @param {InsuranceModule} mod
@@ -645,10 +668,7 @@ function renderValue(value) {
   }
 
   if (typeof value === "string") {
-    var p = document.createElement("p");
-    p.className = "text";
-    p.textContent = value;
-    return p;
+    return renderNumberedText(value);
   }
 
   if (Array.isArray(value)) {
@@ -706,10 +726,18 @@ function renderDrugTable(drugs) {
 
   drugs.forEach(function (d) {
     var tr = document.createElement("tr");
-    tr.innerHTML =
-      "<td>" + escapeHtml(d.drug_name || "") + "</td>" +
-      "<td>" + escapeHtml(d.condition || "") + "</td>" +
-      "<td>" + escapeHtml(d.validity || "") + "</td>";
+    var td1 = document.createElement("td");
+    td1.textContent = d.drug_name || "";
+
+    var td2 = document.createElement("td");
+    td2.innerHTML = formatConditionHtml(d.condition);
+
+    var td3 = document.createElement("td");
+    td3.textContent = d.validity || "";
+
+    tr.appendChild(td1);
+    tr.appendChild(td2);
+    tr.appendChild(td3);
     tbody.appendChild(tr);
   });
 
@@ -807,6 +835,71 @@ function splitTitleAndDetail(text) {
 }
 
 /**
+ * 将 1）2）3） 这种条件分点渲染为列表
+ * @param {string | undefined} condition
+ * @returns {string}
+ */
+function formatConditionHtml(condition) {
+  var text = String(condition || "").trim();
+  if (!text) {
+    return "";
+  }
+  if (text.match(/\d）/)) {
+    var parts = text.split(/\s*\d）/).filter(Boolean);
+    var items = parts.map(function (part, idx) {
+      return "<li>" + (idx + 1) + "）" + escapeHtml(part.trim()) + "</li>";
+    }).join("");
+    return "<ul class=\"list\">" + items + "</ul>";
+  }
+  return escapeHtml(text);
+}
+
+/**
+ * 按编号拆成段落或列表（用于长字符串，如“专家建议”等）
+ * @param {string} text
+ * @returns {HTMLElement}
+ */
+function renderNumberedText(text) {
+  var t = String(text || "").trim();
+
+  // 检测是否存在多个编号 1. / 1、 / 1)
+  var numbered = t.match(/\d[\.、\)]/g);
+  if (numbered && numbered.length >= 2) {
+    var intro = "";
+    var body = t;
+    var introSplit = t.split(/：/);
+    if (introSplit.length > 1) {
+      intro = introSplit[0] + "：";
+      body = introSplit.slice(1).join("：");
+    }
+
+    var parts = body.split(/\s*\d[\.、\)]\s*/).filter(Boolean);
+    var ul = document.createElement("ul");
+    ul.className = "list";
+    parts.forEach(function (part) {
+      var li = document.createElement("li");
+      li.textContent = part.trim();
+      ul.appendChild(li);
+    });
+
+    var wrap = document.createElement("div");
+    if (intro) {
+      var p = document.createElement("p");
+      p.className = "text";
+      p.textContent = intro;
+      wrap.appendChild(p);
+    }
+    wrap.appendChild(ul);
+    return wrap;
+  }
+
+  var p2 = document.createElement("p");
+  p2.className = "text";
+  p2.textContent = t;
+  return p2;
+}
+
+/**
  * 把 [{name,text}] 渲染为更深一层可点开的列表（增强美观与信息密度控制）
  * @param {Array<{name: string, text: string}>} items
  * @returns {HTMLElement}
@@ -856,8 +949,12 @@ async function initApp() {
     return r.json();
   });
 
+  cachedConfig = root;
   renderHero(root);
-  renderModules(root.insurance_data || []);
+
+  if (pendingShowModules) {
+    renderModules(root.insurance_data || []);
+  }
 }
 
 document.addEventListener("DOMContentLoaded", function () {
