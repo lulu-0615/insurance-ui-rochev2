@@ -110,33 +110,9 @@ function renderHero(cfg) {
     titleEl.textContent = cfg.main_title || "多层次保障科普小工具";
   }
   if (subtitleEl) {
-    subtitleEl.textContent = "选择一个模块，按需展开三级/四级内容，快速定位你要的信息。";
+    // Hero 下的解释文案：保持克制（可后续做成 JSON 字段）
+    subtitleEl.textContent = subtitleEl.textContent || "";
   }
-}
-
-/**
- * 渲染二级模块导航（chips）
- * @param {Array<InsuranceModule>} modules
- * @returns {void}
- */
-function renderCategoryToc(modules) {
-  var container = document.getElementById("category-toc");
-  if (!container) {
-    return;
-  }
-  container.innerHTML = "";
-
-  modules.forEach(function (mod) {
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "chip";
-    btn.textContent = mod.insurance_type;
-    var modId = "mod-" + slugify(mod.insurance_type);
-    btn.addEventListener("click", function () {
-      scrollToId(modId);
-    });
-    container.appendChild(btn);
-  });
 }
 
 /**
@@ -152,7 +128,7 @@ function renderModules(modules) {
   root.innerHTML = "";
 
   modules.forEach(function (mod) {
-    root.appendChild(renderModuleSection(mod));
+    root.appendChild(renderModuleCard(mod));
   });
 }
 
@@ -209,132 +185,101 @@ function formatSummary(summary) {
  * @param {InsuranceModule} mod
  * @returns {HTMLElement}
  */
-function renderModuleSection(mod) {
-  var wrapper = document.createElement("section");
-  wrapper.className = "card module " + getModuleClass(mod.insurance_type);
-  wrapper.id = "mod-" + slugify(mod.insurance_type);
+function renderModuleCard(mod) {
+  var card = document.createElement("section");
+  card.className = "card module " + getModuleClass(mod.insurance_type);
 
-  var grid = document.createElement("div");
-  grid.className = "section";
-
-  var left = document.createElement("div");
-  left.className = "section-copy";
+  var header = document.createElement("div");
+  header.className = "module-header";
 
   var title = document.createElement("h2");
-  title.className = "h2";
+  title.className = "module-title";
   title.textContent = mod.insurance_type;
 
-  var desc = document.createElement("p");
-  desc.className = "h2-desc";
-  desc.textContent = formatSummary(mod.summary) || "";
+  var summary = document.createElement("p");
+  summary.className = "module-summary";
+  summary.textContent = formatSummary(mod.summary) || "";
 
-  var tools = document.createElement("div");
-  tools.className = "section-tools";
+  header.appendChild(title);
+  header.appendChild(summary);
 
-  var select = document.createElement("select");
-  select.className = "select";
-  select.setAttribute("aria-label", "三级标题索引");
+  var actions = document.createElement("div");
+  actions.className = "module-actions";
 
-  var defaultOption = document.createElement("option");
-  defaultOption.value = "";
-  defaultOption.textContent = "跳转到三级标题…";
-  select.appendChild(defaultOption);
-
+  // 子分支按钮（sub_branches.title）
   (mod.sub_branches || []).forEach(function (branch) {
-    var opt = document.createElement("option");
-    opt.value = "branch-" + slugify(mod.insurance_type) + "-" + slugify(branch.title);
-    opt.textContent = branch.title;
-    select.appendChild(opt);
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "linkish";
+
+    var left = document.createElement("span");
+    left.textContent = branch.title;
+
+    var right = document.createElement("small");
+    right.textContent = "点击查看";
+
+    btn.appendChild(left);
+    btn.appendChild(right);
+
+    btn.addEventListener("click", function () {
+      renderBranchPanel(card, mod, branch);
+    });
+
+    actions.appendChild(btn);
   });
 
-  select.addEventListener("change", function () {
-    if (!select.value) {
-      return;
-    }
-    scrollToId(select.value);
-    select.value = "";
-  });
-
-  tools.appendChild(select);
-
-  left.appendChild(title);
-  left.appendChild(desc);
-  left.appendChild(tools);
-
-  var right = document.createElement("div");
-  right.className = "card image-card";
+  var imgWrap = document.createElement("div");
+  imgWrap.className = "card image-card";
+  imgWrap.style.marginTop = "0";
 
   var img = document.createElement("img");
-  img.alt = mod.insurance_type + " 模块配图";
+  img.alt = mod.insurance_type + " 配图";
   img.loading = "lazy";
   img.src = getModuleImage(mod.insurance_type);
+  imgWrap.appendChild(img);
 
-  right.appendChild(img);
+  card.appendChild(imgWrap);
+  card.appendChild(header);
+  card.appendChild(actions);
 
-  grid.appendChild(left);
-  grid.appendChild(right);
+  var panel = document.createElement("div");
+  panel.className = "branch-panel";
+  panel.hidden = true;
+  panel.setAttribute("data-branch-panel", "1");
+  card.appendChild(panel);
 
-  wrapper.appendChild(grid);
-
-  // 三级标题：点击展开内容（默认全部折叠）
-  wrapper.appendChild(renderBranchAccordion(mod));
-
-  return wrapper;
+  return card;
 }
 
 /**
- * 渲染三级标题手风琴（sub_branches）
- * @param {InsuranceModule} mod
- * @returns {HTMLElement}
- */
-function renderBranchAccordion(mod) {
-  var container = document.createElement("div");
-  container.className = "accordion accordion-level-3";
-
-  (mod.sub_branches || []).forEach(function (branch) {
-    container.appendChild(renderBranchItem(mod, branch));
-  });
-
-  return container;
-}
-
-/**
- * 渲染单个三级标题条目（details/summary）
+ * 在模块卡片内渲染“子分支详情面板”（三级标题点开后显示）
+ * @param {HTMLElement} card
  * @param {InsuranceModule} mod
  * @param {InsuranceBranch} branch
- * @returns {HTMLElement}
+ * @returns {void}
  */
-function renderBranchItem(mod, branch) {
-  var details = document.createElement("details");
-  details.className = "acc-item";
-  details.id = "branch-" + slugify(mod.insurance_type) + "-" + slugify(branch.title);
+function renderBranchPanel(card, mod, branch) {
+  var panel = card.querySelector("[data-branch-panel='1']");
+  if (!panel) {
+    return;
+  }
+  panel.innerHTML = "";
+  panel.hidden = false;
 
-  var summary = document.createElement("summary");
-  summary.className = "acc-summary";
-
-  var title = document.createElement("div");
-  title.className = "acc-title h3";
-  title.textContent = branch.title;
-
-  summary.appendChild(title);
-
-  details.appendChild(summary);
-
-  var body = document.createElement("div");
-  body.className = "acc-body";
+  var h = document.createElement("h3");
+  h.className = "branch-title";
+  h.textContent = branch.title;
+  panel.appendChild(h);
 
   if (branch.description) {
     var p = document.createElement("p");
-    p.className = "topic-intro";
+    p.className = "text";
     p.textContent = branch.description;
-    body.appendChild(p);
+    panel.appendChild(p);
   }
 
   if (branch.content) {
-    var p2 = document.createElement("p");
-    p2.className = "text";
-    p2.textContent = branch.content;
-    body.appendChild(p2);
+    panel.appendChild(renderTextWithCtas(branch.content));
   }
 
   if (branch.links && branch.links.length) {
@@ -342,35 +287,124 @@ function renderBranchItem(mod, branch) {
     list.className = "list";
     branch.links.forEach(function (l) {
       var li = document.createElement("li");
-      li.textContent = l;
+      li.appendChild(renderTextWithCtas(l));
       list.appendChild(li);
     });
-    body.appendChild(list);
+    panel.appendChild(list);
   }
 
-  if (branch.content_detail) {
-    body.appendChild(renderContentDetailAccordion(branch.content_detail));
-  }
+  if (branch.content_detail && typeof branch.content_detail === "object") {
+    var keys = Object.keys(branch.content_detail);
+    if (keys.length) {
+      var row = document.createElement("div");
+      row.className = "pill-row";
 
-  details.appendChild(body);
-  return details;
+      var content = document.createElement("div");
+      content.className = "block";
+      content.setAttribute("data-detail-content", "1");
+
+      keys.forEach(function (k, idx) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "pill-btn" + (idx === 0 ? " active" : "");
+        b.textContent = k;
+        b.addEventListener("click", function () {
+          var all = row.querySelectorAll(".pill-btn");
+          all.forEach(function (x) {
+            x.classList.remove("active");
+          });
+          b.classList.add("active");
+          content.innerHTML = "";
+          content.appendChild(renderValue(branch.content_detail[k]));
+        });
+        row.appendChild(b);
+      });
+
+      // 默认展示第一个
+      content.appendChild(renderValue(branch.content_detail[keys[0]]));
+
+      panel.appendChild(row);
+      panel.appendChild(content);
+    }
+  }
 }
 
 /**
- * 渲染四级标题手风琴（content_detail 的第一层 key）
- * @param {Record<string, any>} detail
+ * 把包含 URL 的文本渲染为 “文本 + CTA 按钮”
+ * @param {string} text
  * @returns {HTMLElement}
  */
-function renderContentDetailAccordion(detail) {
-  var container = document.createElement("div");
-  container.className = "accordion accordion-level-4";
+function renderTextWithCtas(text) {
+  var wrap = document.createElement("div");
 
-  Object.keys(detail).forEach(function (key) {
-    container.appendChild(renderDetailItem(key, detail[key]));
+  var urls = extractUrls(text);
+  var clean = text;
+  urls.forEach(function (u) {
+    clean = clean.replace(u, "").replace(/\s{2,}/g, " ").trim();
   });
 
-  return container;
+  if (clean) {
+    var p = document.createElement("p");
+    p.className = "text";
+    p.textContent = clean;
+    wrap.appendChild(p);
+  }
+
+  urls.forEach(function (u) {
+    var a = document.createElement("a");
+    a.className = "cta";
+    a.href = u;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = guessCtaLabel(clean) || "打开链接";
+    wrap.appendChild(a);
+  });
+
+  if (!clean && !urls.length) {
+    var p2 = document.createElement("p");
+    p2.className = "text";
+    p2.textContent = text;
+    wrap.appendChild(p2);
+  }
+
+  return wrap;
 }
+
+/**
+ * 猜测 CTA 按钮文案（尽量贴近医疗/咨询语境）
+ * @param {string} context
+ * @returns {string}
+ */
+function guessCtaLabel(context) {
+  var t = String(context || "");
+  if (t.indexOf("咨询") !== -1 || t.indexOf("入口") !== -1) {
+    return "咨询入口";
+  }
+  if (t.indexOf("下载") !== -1) {
+    return "下载";
+  }
+  if (t.indexOf("官网") !== -1) {
+    return "打开官网";
+  }
+  return "打开链接";
+}
+
+/**
+ * 从字符串中提取 URL（http/https）
+ * @param {string} text
+ * @returns {Array<string>}
+ */
+function extractUrls(text) {
+  var m = String(text || "").match(/https?:\/\/[^\s)]+/g);
+  return m ? Array.from(new Set(m)) : [];
+}
+
+/**
+ * 渲染三级标题手风琴（sub_branches）
+ * @param {InsuranceModule} mod
+ * @returns {HTMLElement}
+ */
+// 已由“卡片 + 子分支按钮 + 类型 pills”取代旧的手风琴渲染
 
 /**
  * 渲染单个四级条目（details/summary）
@@ -574,7 +608,6 @@ async function initApp() {
   });
 
   renderHero(root);
-  renderCategoryToc(root.insurance_data || []);
   renderModules(root.insurance_data || []);
 }
 
