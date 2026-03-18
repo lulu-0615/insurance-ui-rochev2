@@ -99,6 +99,32 @@ function initThemeToggle() {
 }
 
 /**
+ * 初始化 Hero CTA
+ * @returns {void}
+ */
+function initHeroCta() {
+  var btn = document.getElementById("hero-cta");
+  if (!btn) {
+    return;
+  }
+  btn.addEventListener("click", function () {
+    scrollToId("features");
+  });
+}
+
+/**
+ * 初始化页脚年份
+ * @returns {void}
+ */
+function initFooterYear() {
+  var el = document.getElementById("year");
+  if (!el) {
+    return;
+  }
+  el.textContent = String(new Date().getFullYear());
+}
+
+/**
  * 渲染顶部标题
  * @param {InsuranceConfigRoot} cfg
  * @returns {void}
@@ -189,6 +215,9 @@ function renderModuleCard(mod) {
   var card = document.createElement("section");
   card.className = "card module " + getModuleClass(mod.insurance_type);
 
+  var actions = document.createElement("div");
+  actions.className = "module-actions";
+
   var header = document.createElement("div");
   header.className = "module-header";
 
@@ -202,9 +231,6 @@ function renderModuleCard(mod) {
 
   header.appendChild(title);
   header.appendChild(summary);
-
-  var actions = document.createElement("div");
-  actions.className = "module-actions";
 
   // 子分支按钮（sub_branches.title）
   (mod.sub_branches || []).forEach(function (branch) {
@@ -222,25 +248,32 @@ function renderModuleCard(mod) {
     btn.appendChild(right);
 
     btn.addEventListener("click", function () {
+      var all = actions.querySelectorAll(".linkish");
+      all.forEach(function (x) {
+        x.classList.remove("active");
+      });
+      btn.classList.add("active");
       renderBranchPanel(card, mod, branch);
     });
 
     actions.appendChild(btn);
   });
 
-  var imgWrap = document.createElement("div");
-  imgWrap.className = "card image-card";
-  imgWrap.style.marginTop = "0";
-
-  var img = document.createElement("img");
-  img.alt = mod.insurance_type + " 配图";
-  img.loading = "lazy";
-  img.src = getModuleImage(mod.insurance_type);
-  imgWrap.appendChild(img);
-
-  card.appendChild(imgWrap);
   card.appendChild(header);
   card.appendChild(actions);
+
+  var bottomLink = document.createElement("a");
+  bottomLink.className = "module-link";
+  bottomLink.href = "javascript:void(0)";
+  bottomLink.textContent = "查看该模块内容 →";
+  bottomLink.addEventListener("click", function (e) {
+    e.preventDefault();
+    var first = actions.querySelector(".linkish");
+    if (first) {
+      first.click();
+    }
+  });
+  card.appendChild(bottomLink);
 
   var panel = document.createElement("div");
   panel.className = "branch-panel";
@@ -283,19 +316,24 @@ function renderBranchPanel(card, mod, branch) {
   }
 
   if (branch.links && branch.links.length) {
-    var list = document.createElement("ul");
-    list.className = "list";
-    branch.links.forEach(function (l) {
-      var li = document.createElement("li");
-      li.appendChild(renderTextWithCtas(l));
-      list.appendChild(li);
-    });
-    panel.appendChild(list);
+    panel.appendChild(renderBranchLinks(branch.links));
   }
 
   if (branch.content_detail && typeof branch.content_detail === "object") {
     var keys = Object.keys(branch.content_detail);
     if (keys.length) {
+      /** @type {Array<{key: string, label: string}>} */
+      var items = keys.map(function (k) {
+        var v = branch.content_detail[k];
+        var label = k;
+        if (v && typeof v === "object" && "header" in v && v.header) {
+          label = String(v.header);
+        } else if (/^part\d+$/i.test(k)) {
+          label = "内容";
+        }
+        return { key: k, label: label };
+      });
+
       var row = document.createElement("div");
       row.className = "pill-row";
 
@@ -303,11 +341,11 @@ function renderBranchPanel(card, mod, branch) {
       content.className = "block";
       content.setAttribute("data-detail-content", "1");
 
-      keys.forEach(function (k, idx) {
+      items.forEach(function (it, idx) {
         var b = document.createElement("button");
         b.type = "button";
         b.className = "pill-btn" + (idx === 0 ? " active" : "");
-        b.textContent = k;
+        b.textContent = it.label;
         b.addEventListener("click", function () {
           var all = row.querySelectorAll(".pill-btn");
           all.forEach(function (x) {
@@ -315,18 +353,129 @@ function renderBranchPanel(card, mod, branch) {
           });
           b.classList.add("active");
           content.innerHTML = "";
-          content.appendChild(renderValue(branch.content_detail[k]));
+          content.appendChild(renderValue(branch.content_detail[it.key]));
         });
         row.appendChild(b);
       });
 
       // 默认展示第一个
-      content.appendChild(renderValue(branch.content_detail[keys[0]]));
+      content.appendChild(renderValue(branch.content_detail[items[0].key]));
 
       panel.appendChild(row);
       panel.appendChild(content);
     }
   }
+}
+
+/**
+ * 将 links 渲染成“按钮跳转/复制”，避免直接露出网址
+ * @param {Array<string>} links
+ * @returns {HTMLElement}
+ */
+function renderBranchLinks(links) {
+  var wrap = document.createElement("div");
+  wrap.className = "link-grid";
+
+  links.forEach(function (raw) {
+    var parsed = parseLinkLine(raw);
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "link-btn";
+
+    var left = document.createElement("span");
+    left.className = "link-btn-title";
+    left.textContent = parsed.label || "跳转";
+
+    var right = document.createElement("small");
+    right.className = "link-btn-meta";
+    right.textContent = parsed.kind === "open" ? "打开" : parsed.kind === "copy" ? "复制" : "待补充";
+
+    btn.appendChild(left);
+    btn.appendChild(right);
+
+    if (parsed.kind === "open" && parsed.target) {
+      btn.addEventListener("click", function () {
+        window.open(parsed.target, "_blank", "noopener,noreferrer");
+      });
+    } else if (parsed.kind === "copy" && parsed.target) {
+      btn.addEventListener("click", function () {
+        copyToClipboard(parsed.target).then(function () {
+          right.textContent = "已复制";
+          window.setTimeout(function () {
+            right.textContent = "复制";
+          }, 1200);
+        });
+      });
+    } else {
+      btn.disabled = true;
+      btn.classList.add("is-disabled");
+    }
+
+    wrap.appendChild(btn);
+  });
+
+  return wrap;
+}
+
+/**
+ * 解析类似 “[1]. 上海：#小程序://xxx” 或 “杭州：https://...” 的行
+ * @param {string} line
+ * @returns {{label: string, kind: "open"|"copy"|"none", target: string}}
+ */
+function parseLinkLine(line) {
+  var text = String(line || "").trim();
+  text = text.replace(/^\[\d+\]\.\s*/, "").replace(/^\(\d+\)\s*/, "");
+
+  var label = text;
+  var target = "";
+
+  // 优先按中文冒号切分
+  var parts = text.split("：");
+  if (parts.length >= 2) {
+    label = parts[0].trim();
+    target = parts.slice(1).join("：").trim();
+  }
+
+  var http = (target || text).match(/https?:\/\/[^\s)]+/);
+  if (http && http[0]) {
+    return { label: label, kind: "open", target: http[0] };
+  }
+
+  // 小程序 schema（浏览器无法直接打开，改为复制）
+  var mini = (target || text).match(/#小程序:\/\/[^\s)]+/);
+  if (mini && mini[0]) {
+    return { label: label, kind: "copy", target: mini[0] };
+  }
+
+  // 没有可用链接
+  return { label: label, kind: "none", target: "" };
+}
+
+/**
+ * 复制到剪贴板（兼容性降级）
+ * @param {string} text
+ * @returns {Promise<void>}
+ */
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise(function (resolve, reject) {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      resolve();
+    } catch (e) {
+      reject(e);
+    }
+  });
 }
 
 /**
@@ -544,17 +693,69 @@ function renderHeaderObject(obj) {
   }
 
   if (obj.strategies && Array.isArray(obj.strategies)) {
-    var ul = document.createElement("ul");
-    ul.className = "list";
-    obj.strategies.forEach(function (s) {
-      var li = document.createElement("li");
-      li.textContent = s;
-      ul.appendChild(li);
-    });
-    wrap.appendChild(ul);
+    wrap.appendChild(renderStrategiesCompact(obj.strategies));
   }
 
   return wrap;
+}
+
+/**
+ * 将 strategies 渲染为“要点标题 + 点击展开详情”，减少首屏字数
+ * @param {Array<string>} strategies
+ * @returns {HTMLElement}
+ */
+function renderStrategiesCompact(strategies) {
+  var container = document.createElement("div");
+  container.className = "compact-list";
+
+  strategies.forEach(function (raw) {
+    var parsed = splitTitleAndDetail(raw);
+
+    var d = document.createElement("details");
+    d.className = "compact-item";
+
+    var s = document.createElement("summary");
+    s.className = "compact-summary";
+
+    var t = document.createElement("div");
+    t.className = "compact-title";
+    t.textContent = parsed.title;
+    s.appendChild(t);
+    d.appendChild(s);
+
+    var body = document.createElement("div");
+    body.className = "compact-body";
+
+    var p = document.createElement("p");
+    p.className = "text";
+    p.textContent = parsed.detail;
+    body.appendChild(p);
+
+    d.appendChild(body);
+    container.appendChild(d);
+  });
+
+  return container;
+}
+
+/**
+ * 从“1.xxx：yyy”中拆分标题与详情
+ * @param {string} text
+ * @returns {{title: string, detail: string}}
+ */
+function splitTitleAndDetail(text) {
+  var t = String(text || "").trim();
+  // 去掉前缀编号（1. / 1、 / 1)）
+  t = t.replace(/^\s*\d+[\.\、\)]\s*/, "");
+  var parts = t.split("：");
+  if (parts.length >= 2) {
+    var title = parts[0].trim();
+    var detail = parts.slice(1).join("：").trim();
+    return { title: title || "要点", detail: detail || "" };
+  }
+  // 无冒号：标题取前 18 字，全文做详情
+  var shortTitle = t.slice(0, 18) + (t.length > 18 ? "…" : "");
+  return { title: shortTitle || "要点", detail: t };
 }
 
 /**
@@ -613,6 +814,8 @@ async function initApp() {
 
 document.addEventListener("DOMContentLoaded", function () {
   initThemeToggle();
+  initHeroCta();
+  initFooterYear();
   initApp().catch(function (err) {
     // eslint-disable-next-line no-console
     console.error(err);
@@ -626,4 +829,3 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 });
-
