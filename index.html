@@ -7,11 +7,29 @@
   <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body class="theme-light">
+  <div class="navbar">
+    <div class="container navbar-inner">
+      <a class="logo" href="#hero" aria-label="返回顶部">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <span class="logo-text">Insurance UI</span>
+      </a>
+      <div class="nav-links" aria-label="站点导航">
+        <a class="nav-link" href="#features">模块</a>
+        <a class="nav-link" href="#footer">说明</a>
+      </div>
+    </div>
+  </div>
+
   <header class="hero" id="hero">
     <div class="container hero-inner">
       <div class="hero-copy">
         <h1 class="h1 hero-title" id="tool-title">多层次保障“科普小工具”</h1>
         <p class="hero-subtitle hero-lead" id="tool-subtitle">帮助患者与家属快速理解不同保障层级，并按需展开查看具体目录、政策与咨询入口。</p>
+        <div class="hero-cta-row">
+          <button id="hero-cta" class="button button-primary" type="button">
+            开始了解保障模块
+          </button>
+        </div>
       </div>
       <div class="hero-actions">
         <button id="theme-toggle" class="button button-secondary" type="button" aria-label="切换明暗主题">
@@ -22,14 +40,23 @@
     </div>
   </header>
 
-  <main class="container main">
+  <main class="container main" id="features">
     <div id="content-root" class="cards" aria-live="polite"></div>
   </main>
 
-  <footer class="container footer">
-    <div class="footer-note">提示：本页面为科普工具，具体政策以当地医保与产品条款为准。</div>
+  <footer class="footer" id="footer">
+    <div class="container footer-inner">
+      <div class="footer-links">
+        <a class="footer-link" href="#hero">返回顶部</a>
+        <span class="footer-dot" aria-hidden="true">·</span>
+        <a class="footer-link" href="#features">查看模块</a>
+      </div>
+      <div class="footer-note">提示：本页面为科普工具，具体政策以当地医保与产品条款为准。</div>
+      <div class="footer-copy">© <span id="year"></span> Roche. All rights reserved.</div>
+    </div>
   </footer>
 
   <script src="./js/app.js"></script>
 </body>
 </html>
+
