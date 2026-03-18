@@ -674,9 +674,6 @@ function renderHuiMinBaoIntro(text) {
   if (features) {
     wrap.appendChild(renderFeaturesBlock(features));
   }
-  if (summary) {
-    wrap.appendChild(renderInfoBlock("一句话总结", summary));
-  }
 
   return wrap;
 }
@@ -1288,5 +1285,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 });
+
 
 
