@@ -19,6 +19,8 @@
   --shadow-rest: 0 2px 6px rgba(15, 23, 42, 0.04);
   --shadow-hover: 0 6px 18px rgba(15, 23, 42, 0.08);
 
+  --noise-opacity: 0.06;
+
   --space-4: 4px;
   --space-8: 8px;
   --space-12: 12px;
@@ -62,6 +64,17 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: var(--font-14);
   line-height: 1.6;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--noise-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  mix-blend-mode: overlay;
 }
 
 .container {
@@ -241,6 +254,155 @@ body {
   border-color: var(--color-gray-300);
 }
 
+.module {
+  position: relative;
+  overflow: hidden;
+}
+
+.module::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  background: radial-gradient(800px 260px at 18% 0%, rgba(37, 99, 235, 0.16), rgba(37, 99, 235, 0) 60%);
+}
+
+.module::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: calc(var(--noise-opacity) * 0.9);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  mix-blend-mode: overlay;
+}
+
+.module > * {
+  position: relative;
+  z-index: 1;
+}
+
+.module--basic::before {
+  background:
+    radial-gradient(760px 240px at 10% 0%, rgba(37, 99, 235, 0.18), rgba(37, 99, 235, 0) 60%),
+    radial-gradient(560px 240px at 90% 10%, rgba(99, 102, 241, 0.12), rgba(99, 102, 241, 0) 60%);
+}
+
+.module--hmb::before {
+  background:
+    radial-gradient(760px 240px at 10% 0%, rgba(16, 185, 129, 0.16), rgba(16, 185, 129, 0) 60%),
+    radial-gradient(560px 240px at 90% 10%, rgba(37, 99, 235, 0.10), rgba(37, 99, 235, 0) 60%);
+}
+
+.module--commercial::before {
+  background:
+    radial-gradient(760px 240px at 10% 0%, rgba(17, 24, 39, 0.12), rgba(17, 24, 39, 0) 60%),
+    radial-gradient(560px 240px at 90% 10%, rgba(37, 99, 235, 0.10), rgba(37, 99, 235, 0) 60%);
+}
+
+.h2 {
+  margin: 0;
+  font-size: var(--font-24);
+  line-height: 1.4;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.h3 {
+  margin: 0;
+  font-size: var(--font-20);
+  line-height: 1.4;
+  font-weight: 650;
+  color: var(--color-text);
+}
+
+.h4 {
+  margin: 0;
+  font-size: var(--font-16);
+  line-height: 1.4;
+  font-weight: 650;
+  color: var(--color-muted);
+}
+
+.h5 {
+  margin: 0;
+  font-size: var(--font-14);
+  line-height: 1.4;
+  font-weight: 650;
+  color: var(--color-muted);
+}
+
+.accordion {
+  margin-top: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.acc-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: rgba(255, 255, 255, 0.55);
+  box-shadow: var(--shadow-rest);
+  overflow: hidden;
+}
+
+.theme-dark .acc-item {
+  background-color: rgba(15, 23, 42, 0.55);
+}
+
+.acc-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: var(--space-12) var(--space-16);
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  user-select: none;
+}
+
+.acc-summary::-webkit-details-marker {
+  display: none;
+}
+
+.acc-summary::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--color-muted);
+  transition: transform 0.18s ease;
+}
+
+details[open] > .acc-summary::after {
+  transform: rotate(180deg);
+}
+
+.acc-body {
+  padding: 0 var(--space-16) var(--space-16) var(--space-16);
+}
+
+.accordion-level-4 .acc-item {
+  background-color: rgba(255, 255, 255, 0.38);
+}
+
+.theme-dark .accordion-level-4 .acc-item {
+  background-color: rgba(15, 23, 42, 0.38);
+}
+
+.accordion-level-5 .acc-item {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.accordion-level-5 .acc-summary {
+  padding: var(--space-8) var(--space-12);
+}
+
+.accordion-level-5 .acc-body {
+  padding: 0 var(--space-12) var(--space-12) var(--space-12);
+}
+
 .section {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
@@ -388,4 +550,3 @@ a:hover {
   color: var(--color-muted);
   font-size: var(--font-12);
 }
-
