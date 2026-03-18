@@ -10,12 +10,8 @@
   <header class="hero" id="hero">
     <div class="container hero-inner">
       <div class="hero-copy">
-        <div class="hero-top">
-          <span class="brand-dot" aria-hidden="true"></span>
-          <span class="hero-kicker">科普工具</span>
-        </div>
-        <h1 class="h1" id="tool-title">多层次保障科普小工具</h1>
-        <p class="hero-subtitle" id="tool-subtitle">从居民医保 → 惠民保 → 商业险，帮你一步步看清自己的保障组合。</p>
+        <h1 class="h1 hero-title" id="tool-title">多层次保障“科普小工具”</h1>
+        <p class="hero-subtitle hero-lead" id="tool-subtitle">帮助患者与家属快速理解不同保障层级，并按需展开查看具体目录、政策与咨询入口。</p>
       </div>
       <div class="hero-actions">
         <button id="theme-toggle" class="button button-secondary" type="button" aria-label="切换明暗主题">
@@ -27,15 +23,7 @@
   </header>
 
   <main class="container main">
-    <nav class="card toc" aria-label="模块导航">
-      <div class="card-header">
-        <div class="card-title">模块导航</div>
-        <div class="card-desc">跳转到你想看的二级模块。</div>
-      </div>
-      <div id="category-toc" class="toc-list"></div>
-    </nav>
-
-    <div id="content-root" class="stack" aria-live="polite"></div>
+    <div id="content-root" class="cards" aria-live="polite"></div>
   </main>
 
   <footer class="container footer">
