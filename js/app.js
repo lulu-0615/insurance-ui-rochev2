@@ -685,6 +685,14 @@ function renderValue(value) {
     }
 
     // 普通字符串数组
+    var allStrings = value.every(function (item) {
+      return typeof item === "string";
+    });
+
+    if (allStrings && shouldRenderAsProductCards(/** @type {Array<string>} */ (value))) {
+      return renderProductCardsFromStrings(/** @type {Array<string>} */ (value));
+    }
+
     var ul = document.createElement("ul");
     ul.className = "list";
     value.forEach(function (item) {
@@ -862,6 +870,57 @@ function formatConditionHtml(condition) {
 function renderNumberedText(text) {
   var t = String(text || "").trim();
 
+  // 处理 PS 提示
+  var psIndex = t.indexOf("PS：");
+  var psText = "";
+  if (psIndex === -1) {
+    psIndex = t.indexOf("Ps：");
+  }
+  if (psIndex !== -1) {
+    psText = t.slice(psIndex).trim();
+    t = t.slice(0, psIndex).trim();
+  }
+
+  // 特殊处理包含 WHY？ / What？ 的说明
+  if (t.indexOf("WHY？") !== -1 || t.indexOf("What？") !== -1) {
+    var wrapWhy = document.createElement("div");
+
+    var before = t.split("WHY？")[0];
+    if (before.trim()) {
+      var pb = document.createElement("p");
+      pb.className = "text";
+      pb.textContent = before.trim();
+      wrapWhy.appendChild(pb);
+    }
+
+    var rest = t.slice(t.indexOf("WHY？"));
+    var segs = rest.split(/(WHY？|What？)/).filter(Boolean);
+    for (var i = 0; i < segs.length; i += 2) {
+      var label = segs[i];
+      var content = segs[i + 1] || "";
+      var pLabel = document.createElement("p");
+      pLabel.className = "tip-heading";
+      pLabel.textContent = label;
+      wrapWhy.appendChild(pLabel);
+
+      if (content.trim()) {
+        var pContent = document.createElement("p");
+        pContent.className = "text";
+        pContent.textContent = content.trim();
+        wrapWhy.appendChild(pContent);
+      }
+    }
+
+    if (psText) {
+      var psP = document.createElement("p");
+      psP.className = "tip-text";
+      psP.textContent = psText;
+      wrapWhy.appendChild(psP);
+    }
+
+    return wrapWhy;
+  }
+
   // 检测是否存在多个编号 1. / 1、 / 1)
   var numbered = t.match(/\d[\.、\)]/g);
   if (numbered && numbered.length >= 2) {
@@ -890,13 +949,79 @@ function renderNumberedText(text) {
       wrap.appendChild(p);
     }
     wrap.appendChild(ul);
+
+    if (psText) {
+      var psNode = document.createElement("p");
+      psNode.className = "tip-text";
+      psNode.textContent = psText;
+      wrap.appendChild(psNode);
+    }
+
     return wrap;
   }
 
   var p2 = document.createElement("p");
   p2.className = "text";
-  p2.textContent = t;
+  p2.textContent = psText ? t : t;
+  // 如果有 PS，仅在后面追加小贴士
+  if (psText) {
+    var wrapSingle = document.createElement("div");
+    wrapSingle.appendChild(p2);
+    var psNode2 = document.createElement("p");
+    psNode2.className = "tip-text";
+    psNode2.textContent = psText;
+    wrapSingle.appendChild(psNode2);
+    return wrapSingle;
+  }
   return p2;
+}
+
+/**
+ * 判断是否适合用“小卡片”展示的产品数组
+ * @param {Array<string>} items
+ * @returns {boolean}
+ */
+function shouldRenderAsProductCards(items) {
+  if (!items.length || items.length > 6) {
+    return false;
+  }
+  return items.every(function (s) {
+    return typeof s === "string" && s.indexOf("：") !== -1;
+  });
+}
+
+/**
+ * 将 ["产品名：描述", ...] 渲染为小卡片
+ * @param {Array<string>} items
+ * @returns {HTMLElement}
+ */
+function renderProductCardsFromStrings(items) {
+  var wrap = document.createElement("div");
+  wrap.className = "product-cards";
+
+  items.forEach(function (raw) {
+    var text = String(raw || "");
+    var parts = text.split("：");
+    var title = parts[0].trim();
+    var desc = parts.slice(1).join("：").trim();
+
+    var card = document.createElement("div");
+    card.className = "product-card";
+
+    var h = document.createElement("div");
+    h.className = "product-title";
+    h.textContent = title;
+
+    var p = document.createElement("div");
+    p.className = "product-desc";
+    p.textContent = desc;
+
+    card.appendChild(h);
+    card.appendChild(p);
+    wrap.appendChild(card);
+  });
+
+  return wrap;
 }
 
 /**
@@ -974,4 +1099,5 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 });
+
 
