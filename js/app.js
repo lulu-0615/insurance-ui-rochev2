@@ -378,7 +378,12 @@ function renderBranchPanel(card, mod, branch) {
   }
 
   if (branch.content) {
-    panel.appendChild(renderTextWithCtas(branch.content));
+    // 惠民保“是什么”内容：做成结构化分块（定义/举例/共同特点/总结）
+    if (String(branch.title || "").indexOf("惠民保是什么") !== -1) {
+      panel.appendChild(renderHuiMinBaoIntro(String(branch.content)));
+    } else {
+      panel.appendChild(renderTextWithCtas(branch.content));
+    }
   }
 
   if (branch.links && branch.links.length) {
@@ -620,6 +625,118 @@ var cachedConfig = null;
 var pendingShowModules = false;
 
 /**
+ * 惠民保“是什么”结构化展示：定义 → 举例 → 共同特点 → 总结
+ * @param {string} text
+ * @returns {HTMLElement}
+ */
+function renderHuiMinBaoIntro(text) {
+  var t = String(text || "").trim();
+  var wrap = document.createElement("div");
+  wrap.className = "info-blocks";
+
+  // 1) 定义：第一句（到第一个句号）
+  var firstDot = t.indexOf("。");
+  var definition = firstDot !== -1 ? t.slice(0, firstDot + 1) : t;
+  var rest = firstDot !== -1 ? t.slice(firstDot + 1) : "";
+
+  // 2) 举例：包含“比如”的句子
+  var example = "";
+  var exMatch = rest.match(/比如[^。]*。/);
+  if (exMatch && exMatch[0]) {
+    example = exMatch[0];
+    rest = rest.replace(exMatch[0], "");
+  }
+
+  // 3) 共同特点：包含“共同特点”的部分
+  var features = "";
+  var featIdx = rest.indexOf("共同特点");
+  if (featIdx !== -1) {
+    features = rest.slice(featIdx);
+    rest = rest.slice(0, featIdx);
+  }
+
+  // 4) 总结：最后一句
+  var summary = "";
+  var lastDot = features.lastIndexOf("。");
+  if (lastDot !== -1) {
+    summary = features.slice(lastDot).trim();
+    features = features.slice(0, lastDot).trim();
+  }
+  if (!summary) {
+    var last = t.match(/[^。]*。$/);
+    summary = last ? last[0] : "";
+  }
+
+  wrap.appendChild(renderInfoBlock("定义", definition));
+  if (example) {
+    wrap.appendChild(renderInfoBlock("举例", example));
+  }
+  if (features) {
+    wrap.appendChild(renderFeaturesBlock(features));
+  }
+  if (summary) {
+    wrap.appendChild(renderInfoBlock("一句话总结", summary));
+  }
+
+  return wrap;
+}
+
+/**
+ * 渲染一个“信息块”
+ * @param {string} title
+ * @param {string} body
+ * @returns {HTMLElement}
+ */
+function renderInfoBlock(title, body) {
+  var block = document.createElement("div");
+  block.className = "info-block";
+
+  var h = document.createElement("div");
+  h.className = "info-title";
+  h.textContent = title;
+
+  var p = document.createElement("div");
+  p.className = "info-text";
+  p.textContent = String(body || "").trim();
+
+  block.appendChild(h);
+  block.appendChild(p);
+  return block;
+}
+
+/**
+ * 渲染“共同特点”块：把“几乎零门槛：...” “价格非常亲民：...” 拆成两条
+ * @param {string} text
+ * @returns {HTMLElement}
+ */
+function renderFeaturesBlock(text) {
+  var block = document.createElement("div");
+  block.className = "info-block";
+
+  var h = document.createElement("div");
+  h.className = "info-title";
+  h.textContent = "共同特点";
+  block.appendChild(h);
+
+  // 尝试按分号拆
+  var items = text.split(/；/).map(function (x) { return x.trim(); }).filter(Boolean);
+  var ul = document.createElement("ul");
+  ul.className = "list";
+  items.forEach(function (it) {
+    // 去掉前导“共同特点：”
+    it = it.replace(/^.*共同特点：?/, "").trim();
+    if (!it) {
+      return;
+    }
+    var li = document.createElement("li");
+    li.textContent = it;
+    ul.appendChild(li);
+  });
+  block.appendChild(ul);
+  return block;
+}
+
+/**
  * 渲染三级标题手风琴（sub_branches）
  * @param {InsuranceModule} mod
  * @returns {HTMLElement}
@@ -766,10 +883,12 @@ function renderHeaderObject(obj) {
   wrap.appendChild(title);
 
   if (obj.text) {
-    var p = document.createElement("p");
-    p.className = "text";
-    p.textContent = obj.text;
-    wrap.appendChild(p);
+    // 针对“什么叫医保报销”：把个人账户/统筹账户拆成两条，避免一整段
+    if (String(obj.header || "").indexOf("什么叫医保报销") !== -1) {
+      wrap.appendChild(renderAccountSplitText(String(obj.text)));
+    } else {
+      wrap.appendChild(renderNumberedText(String(obj.text)));
+    }
   }
 
   if (obj.conditions && Array.isArray(obj.conditions)) {
@@ -780,6 +899,40 @@ function renderHeaderObject(obj) {
     wrap.appendChild(renderStrategiesCompact(obj.strategies));
   }
 
+  return wrap;
+}
+
+/**
+ * 将“个人账户… 统筹账户…”拆成两条说明
+ * @param {string} text
+ * @returns {HTMLElement}
+ */
+function renderAccountSplitText(text) {
+  var t = String(text || "").trim();
+  var wrap = document.createElement("div");
+
+  // 尝试提取个人账户/统筹账户两段
+  var idxA = t.indexOf("个人账户");
+  var idxB = t.indexOf("统筹账户");
+  if (idxA !== -1 && idxB !== -1 && idxB > idxA) {
+    var a = t.slice(idxA, idxB).trim();
+    var b = t.slice(idxB).trim();
+
+    var ul = document.createElement("ul");
+    ul.className = "list";
+
+    [a, b].forEach(function (seg) {
+      var li = document.createElement("li");
+      li.appendChild(renderNumberedText(seg));
+      ul.appendChild(li);
+    });
+
+    wrap.appendChild(ul);
+    return wrap;
+  }
+
+  // fallback：正常渲染
+  wrap.appendChild(renderNumberedText(t));
   return wrap;
 }
 
@@ -881,7 +1034,7 @@ function renderNumberedText(text) {
     t = t.slice(0, psIndex).trim();
   }
 
-  // 特殊处理包含 WHY？ / What？ 的说明
+  // 特殊处理包含 WHY？ / What？ 的说明（做成小贴士）
   if (t.indexOf("WHY？") !== -1 || t.indexOf("What？") !== -1) {
     var wrapWhy = document.createElement("div");
 
@@ -893,7 +1046,11 @@ function renderNumberedText(text) {
       wrapWhy.appendChild(pb);
     }
 
-    var rest = t.slice(t.indexOf("WHY？"));
+    var startIdx = t.indexOf("WHY？");
+    if (startIdx === -1) {
+      startIdx = t.indexOf("What？");
+    }
+    var rest = t.slice(startIdx);
     var segs = rest.split(/(WHY？|What？)/).filter(Boolean);
     for (var i = 0; i < segs.length; i += 2) {
       var label = segs[i];
@@ -904,10 +1061,23 @@ function renderNumberedText(text) {
       wrapWhy.appendChild(pLabel);
 
       if (content.trim()) {
-        var pContent = document.createElement("p");
-        pContent.className = "text";
-        pContent.textContent = content.trim();
-        wrapWhy.appendChild(pContent);
+        // What？后面经常带 1）2）…，拆成分点
+        if (label === "What？" && content.match(/\d）/)) {
+          var parts = content.split(/\s*\d）/).filter(Boolean);
+          var ul = document.createElement("ul");
+          ul.className = "list";
+          parts.forEach(function (part, idx) {
+            var li = document.createElement("li");
+            li.textContent = (idx + 1) + "）" + part.trim();
+            ul.appendChild(li);
+          });
+          wrapWhy.appendChild(ul);
+        } else {
+          var pContent = document.createElement("p");
+          pContent.className = "text";
+          pContent.textContent = content.trim();
+          wrapWhy.appendChild(pContent);
+        }
       }
     }
 
@@ -921,8 +1091,8 @@ function renderNumberedText(text) {
     return wrapWhy;
   }
 
-  // 检测是否存在多个编号 1. / 1、 / 1)
-  var numbered = t.match(/\d[\.、\)]/g);
+  // 检测是否存在多个编号 1. / 1、 / 1) / 1）
+  var numbered = t.match(/\d[\.、\)）]/g);
   if (numbered && numbered.length >= 2) {
     var intro = "";
     var body = t;
@@ -932,7 +1102,7 @@ function renderNumberedText(text) {
       body = introSplit.slice(1).join("：");
     }
 
-    var parts = body.split(/\s*\d[\.、\)]\s*/).filter(Boolean);
+    var parts = body.split(/\s*\d[\.、\)）]\s*/).filter(Boolean);
     var ul = document.createElement("ul");
     ul.className = "list";
     parts.forEach(function (part) {
@@ -982,12 +1152,18 @@ function renderNumberedText(text) {
  * @returns {boolean}
  */
 function shouldRenderAsProductCards(items) {
-  if (!items.length || items.length > 6) {
+  if (!items.length || items.length > 8) {
     return false;
   }
-  return items.every(function (s) {
-    return typeof s === "string" && s.indexOf("：") !== -1;
+  // 允许部分没有“：”，只要大多数是“产品名：说明”结构或包含【】信息
+  var score = 0;
+  items.forEach(function (s) {
+    var t = String(s || "");
+    if (t.indexOf("：") !== -1 || t.indexOf("[") !== -1 || t.indexOf("【") !== -1 || t.indexOf("（") !== -1) {
+      score += 1;
+    }
   });
+  return score >= Math.max(2, Math.ceil(items.length * 0.6));
 }
 
 /**
@@ -1002,8 +1178,24 @@ function renderProductCardsFromStrings(items) {
   items.forEach(function (raw) {
     var text = String(raw || "");
     var parts = text.split("：");
-    var title = parts[0].trim();
-    var desc = parts.slice(1).join("：").trim();
+    var title = "";
+    var desc = "";
+
+    if (parts.length >= 2) {
+      title = parts[0].trim();
+      desc = parts.slice(1).join("：").trim();
+    } else {
+      // 没有冒号：尝试从“推出的[xxx]”中提取产品名
+      var bracket = text.match(/[\[【]([^\]】]+)[\]】]/);
+      if (bracket && bracket[1]) {
+        title = bracket[1].trim();
+        desc = text.replace(bracket[0], "").trim();
+      } else {
+        // fallback：标题取前 18 字
+        title = text.slice(0, 18) + (text.length > 18 ? "…" : "");
+        desc = text;
+      }
+    }
 
     var card = document.createElement("div");
     card.className = "product-card";
@@ -1049,10 +1241,7 @@ function renderNestedAccordionFromNamedText(items) {
 
     var b = document.createElement("div");
     b.className = "acc-body acc-body-5";
-    var p = document.createElement("p");
-    p.className = "text";
-    p.textContent = it.text || "";
-    b.appendChild(p);
+    b.appendChild(renderNumberedText(it.text || ""));
     d.appendChild(b);
 
     container.appendChild(d);
