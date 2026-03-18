@@ -189,21 +189,71 @@ function getModuleClass(insuranceType) {
 }
 
 /**
- * 将 summary 对象格式化成一段简介文字
+ * 将 summary 对象格式化为“少量要点”，便于扫读
  * @param {Record<string, string> | undefined} summary
- * @returns {string}
+ * @returns {Array<{label: string, text: string}>}
  */
 function formatSummary(summary) {
   if (!summary) {
-    return "";
+    return [];
   }
-  var keys = Object.keys(summary);
-  if (!keys.length) {
-    return "";
+  var preferred = ["作用", "亮点", "局限"];
+  /** @type {Array<{label: string, text: string}>} */
+  var pairs = [];
+
+  preferred.forEach(function (k) {
+    if (summary[k]) {
+      pairs.push({ label: k, text: String(summary[k]) });
+    }
+  });
+
+  // 补齐其它字段（最多 3 条）
+  Object.keys(summary).forEach(function (k) {
+    if (preferred.indexOf(k) !== -1) {
+      return;
+    }
+    if (pairs.length >= 3) {
+      return;
+    }
+    if (summary[k]) {
+      pairs.push({ label: k, text: String(summary[k]) });
+    }
+  });
+
+  return pairs.slice(0, 3);
+}
+
+/**
+ * 渲染 summary 为两到三行要点（带行数截断）
+ * @param {Array<{label: string, text: string}>} pairs
+ * @returns {HTMLElement}
+ */
+function renderSummaryBlock(pairs) {
+  var wrap = document.createElement("div");
+  wrap.className = "module-summary";
+
+  if (!pairs.length) {
+    return wrap;
   }
-  return keys.map(function (k) {
-    return k + "：" + (summary[k] || "");
-  }).join(" ");
+
+  pairs.forEach(function (p) {
+    var row = document.createElement("div");
+    row.className = "summary-row";
+
+    var label = document.createElement("span");
+    label.className = "summary-label";
+    label.textContent = p.label;
+
+    var text = document.createElement("span");
+    text.className = "summary-text";
+    text.textContent = p.text;
+
+    row.appendChild(label);
+    row.appendChild(text);
+    wrap.appendChild(row);
+  });
+
+  return wrap;
 }
 
 /**
@@ -225,9 +275,7 @@ function renderModuleCard(mod) {
   title.className = "module-title";
   title.textContent = mod.insurance_type;
 
-  var summary = document.createElement("p");
-  summary.className = "module-summary";
-  summary.textContent = formatSummary(mod.summary) || "";
+  var summary = renderSummaryBlock(formatSummary(mod.summary));
 
   header.appendChild(title);
   header.appendChild(summary);
@@ -829,3 +877,4 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 });
+
