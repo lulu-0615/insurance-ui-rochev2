@@ -284,17 +284,68 @@ function renderMobileServiceCard(item) {
   indicator.className = "seg-indicator";
   seg.appendChild(indicator);
 
-  var track = document.createElement("div");
-  track.className = "carousel";
-  track.setAttribute("role", "region");
-  track.setAttribute("aria-label", "内容分页");
-
-  var dots = document.createElement("div");
-  dots.className = "dots";
-
   var tabs = item.tabs || [];
   var tabButtons = [];
-  var dotEls = [];
+  var content = document.createElement("div");
+  content.className = "svc-content";
+
+  /**
+   * 渲染：某个 tab 内部的“药物横滑” + dots
+   * @param {AppTab} tab
+   * @returns {HTMLElement}
+   */
+  function renderTabDrugSwiper(tab) {
+    var wrap2 = document.createElement("div");
+    wrap2.className = "drug-wrap";
+
+    var track = document.createElement("div");
+    track.className = "drug-carousel";
+    track.setAttribute("role", "region");
+    track.setAttribute("aria-label", "药物分页");
+
+    var dots = document.createElement("div");
+    dots.className = "dots";
+
+    /** @type {Array<AppListItem>} */
+    var items = tab.items || [];
+    /** @type {Array<HTMLElement>} */
+    var dotEls = [];
+
+    items.forEach(function (it, idx) {
+      var page = document.createElement("div");
+      page.className = "drug-page";
+      page.appendChild(renderDrugCard(it));
+      track.appendChild(page);
+
+      var dot = document.createElement("button");
+      dot.type = "button";
+      dot.className = "dot" + (idx === 0 ? " active" : "");
+      dot.addEventListener("click", function () {
+        scrollCarouselTo(track, idx);
+        setActiveDrugIndex(idx);
+      });
+      dotEls.push(dot);
+      dots.appendChild(dot);
+    });
+
+    function setActiveDrugIndex(idx) {
+      dotEls.forEach(function (x, i) {
+        x.classList.toggle("active", i === idx);
+      });
+    }
+
+    track.addEventListener("scroll", function () {
+      var idx = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+      idx = Math.min(Math.max(idx, 0), Math.max(0, items.length - 1));
+      setActiveDrugIndex(idx);
+    }, { passive: true });
+
+    wrap2.appendChild(track);
+    if (items.length > 1) {
+      wrap2.appendChild(dots);
+    }
+    return wrap2;
+  }
 
   tabs.forEach(function (tab, idx) {
     var b = document.createElement("button");
@@ -302,57 +353,127 @@ function renderMobileServiceCard(item) {
     b.className = "seg-btn" + (idx === 0 ? " active" : "");
     b.textContent = tab.title;
     b.addEventListener("click", function () {
-      scrollCarouselTo(track, idx);
-      setActiveIndex(idx);
+      setActiveTabIndex(idx);
     });
     tabButtons.push(b);
     seg.appendChild(b);
-
-    var page = document.createElement("div");
-    page.className = "carousel-page";
-    page.appendChild(renderListView(tab.items || []));
-    track.appendChild(page);
-
-    var dot = document.createElement("button");
-    dot.type = "button";
-    dot.className = "dot" + (idx === 0 ? " active" : "");
-    dot.addEventListener("click", function () {
-      scrollCarouselTo(track, idx);
-      setActiveIndex(idx);
-    });
-    dotEls.push(dot);
-    dots.appendChild(dot);
   });
 
-  function setActiveIndex(idx) {
+  function setActiveTabIndex(idx) {
     tabButtons.forEach(function (x, i) {
-      x.classList.toggle("active", i === idx);
-    });
-    dotEls.forEach(function (x, i) {
       x.classList.toggle("active", i === idx);
     });
     if (tabButtons[idx]) {
       positionIndicator(indicator, tabButtons[idx]);
     }
+
+    // 原地切换内容区：tab 切换不滑动页面
+    content.innerHTML = "";
+    if (tabs[idx]) {
+      content.appendChild(renderTabDrugSwiper(tabs[idx]));
+    }
   }
 
-  track.addEventListener("scroll", function () {
-    var idx = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
-    idx = Math.min(Math.max(idx, 0), tabs.length - 1);
-    setActiveIndex(idx);
+  seg.addEventListener("scroll", function () {
+    var active = seg.querySelector(".seg-btn.active");
+    if (active) {
+      positionIndicator(indicator, /** @type {HTMLElement} */ (active));
+    }
   }, { passive: true });
 
   window.setTimeout(function () {
     if (tabButtons[0]) {
       positionIndicator(indicator, tabButtons[0]);
     }
+    setActiveTabIndex(0);
   }, 0);
 
   header.appendChild(seg);
   wrap.appendChild(header);
-  wrap.appendChild(track);
-  wrap.appendChild(dots);
+  wrap.appendChild(content);
   return wrap;
+}
+
+/**
+ * 药物卡片：单条 item 的展示（标题/副标题/分点/小贴士/有效期）
+ * @param {AppListItem} it
+ * @returns {HTMLElement}
+ */
+function renderDrugCard(it) {
+  var card = document.createElement("div");
+  card.className = "drug-card";
+
+  var top = document.createElement("div");
+  top.className = "lv-top";
+
+  var title = document.createElement("div");
+  title.className = "lv-title";
+  title.textContent = it.title;
+  top.appendChild(title);
+
+  // 右侧仅用于有效期（与 list view 规则一致）
+  if (it.right) {
+    var t = String(it.right || "");
+    var showRight = t.indexOf("有效期") >= 0 || /\d{4}\/\d{1,2}\/\d{1,2}/.test(t);
+    if (showRight) {
+      var right = document.createElement("div");
+      right.className = "lv-right";
+      right.textContent = it.right;
+      top.appendChild(right);
+    }
+  }
+
+  card.appendChild(top);
+
+  if (it.subtitle) {
+    var sub = document.createElement("div");
+    sub.className = "lv-subtitle";
+    sub.textContent = it.subtitle;
+    card.appendChild(sub);
+  }
+
+  if (it.bullets && it.bullets.length) {
+    var bl = document.createElement("ul");
+    bl.className = "lv-bullets";
+    it.bullets.forEach(function (b) {
+      var li = document.createElement("li");
+      li.textContent = b;
+      bl.appendChild(li);
+    });
+    card.appendChild(bl);
+  }
+
+  if (it.tips && it.tips.length) {
+    var tips = document.createElement("div");
+    tips.className = "lv-tips";
+    it.tips.forEach(function (t) {
+      var p = document.createElement("div");
+      p.className = "lv-tip";
+      p.textContent = t;
+      tips.appendChild(p);
+    });
+    card.appendChild(tips);
+  }
+
+  if (it.link) {
+    var actions = document.createElement("div");
+    actions.className = "lv-actions";
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "lv-link";
+    btn.textContent = it.link_kind === "copy" ? "复制链接" : "打开链接";
+    btn.addEventListener("click", function () {
+      if (it.link_kind === "copy") {
+        copyToClipboard(it.link || "");
+      } else {
+        window.open(it.link, "_blank", "noopener,noreferrer");
+      }
+    });
+    actions.appendChild(btn);
+    card.appendChild(actions);
+  }
+
+  return card;
 }
 
 /**
@@ -363,6 +484,26 @@ function renderMobileServiceCard(item) {
 function renderListView(items) {
   var ul = document.createElement("div");
   ul.className = "listview";
+
+  /**
+   * @param {string} s
+   * @returns {string}
+   */
+  function stripConditionPrefix(s) {
+    return String(s || "").replace(/^医保报销条件：\s*/g, "").trim();
+  }
+
+  /**
+   * 右侧文本仅用于“有效期”类信息
+   * @param {string} s
+   * @returns {boolean}
+   */
+  function isLikelyValidity(s) {
+    var t = String(s || "");
+    if (!t) return false;
+    if (t.indexOf("有效期") >= 0) return true;
+    return /\d{4}\/\d{1,2}\/\d{1,2}/.test(t);
+  }
 
   items.forEach(function (it) {
     var row = document.createElement("div");
@@ -379,7 +520,7 @@ function renderListView(items) {
     title.textContent = it.title;
     top.appendChild(title);
 
-    if (it.right) {
+    if (it.right && isLikelyValidity(it.right)) {
       var right = document.createElement("div");
       right.className = "lv-right";
       right.textContent = it.right;
@@ -388,17 +529,32 @@ function renderListView(items) {
 
     main.appendChild(top);
 
+    /** @type {Array<string>} */
+    var bullets = [];
+    if (it.bullets && it.bullets.length) {
+      bullets = bullets.concat(it.bullets);
+    }
     if (it.subtitle) {
-      var sub = document.createElement("div");
-      sub.className = "lv-subtitle";
-      sub.textContent = it.subtitle;
-      main.appendChild(sub);
+      var cleanSub = stripConditionPrefix(it.subtitle);
+      // “医保报销条件”类信息统一进入分点，不再作为单独 subtitle 展示
+      if (cleanSub && cleanSub !== it.subtitle) {
+        bullets.unshift(cleanSub);
+      } else if (cleanSub) {
+        var sub = document.createElement("div");
+        sub.className = "lv-subtitle";
+        sub.textContent = cleanSub;
+        main.appendChild(sub);
+      }
     }
 
-    if (it.bullets && it.bullets.length) {
+    bullets = bullets
+      .map(function (b) { return stripConditionPrefix(b); })
+      .filter(function (b) { return !!b && b !== "医保报销条件："; });
+
+    if (bullets.length) {
       var bl = document.createElement("ul");
       bl.className = "lv-bullets";
-      it.bullets.forEach(function (b) {
+      bullets.forEach(function (b) {
         var li = document.createElement("li");
         li.textContent = b;
         bl.appendChild(li);
@@ -460,10 +616,8 @@ function scrollCarouselTo(track, idx) {
  * @returns {void}
  */
 function positionIndicator(indicator, btn) {
-  var rect = btn.getBoundingClientRect();
-  var parentRect = btn.parentElement ? btn.parentElement.getBoundingClientRect() : rect;
-  indicator.style.width = rect.width + "px";
-  indicator.style.transform = "translateX(" + (rect.left - parentRect.left) + "px)";
+  indicator.style.width = btn.offsetWidth + "px";
+  indicator.style.transform = "translateX(" + btn.offsetLeft + "px)";
 }
 
 /**
@@ -531,4 +685,5 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 });
+
 
