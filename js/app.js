@@ -1,4 +1,3 @@
-
 /**
  * @typedef {Object} AppListItem
  * @property {string} id
@@ -164,9 +163,7 @@ function renderAppModuleCard(mod) {
   title.className = "module-title module-title-centered";
   title.textContent = mod.title;
 
-  var desc = document.createElement("div");
-  desc.className = "module-l1-desc";
-  desc.textContent = mod.description || "";
+  var desc = renderL1Description(mod.description || "");
 
   header.appendChild(title);
   header.appendChild(desc);
@@ -181,6 +178,53 @@ function renderAppModuleCard(mod) {
 
   card.appendChild(acc);
   return card;
+}
+
+/**
+ * 一级说明：把“作用：xxx\\n局限：yyy”渲染成左标签右内容的轻量表格
+ * @param {string} text
+ * @returns {HTMLElement}
+ */
+function renderL1Description(text) {
+  var wrap = document.createElement("div");
+  wrap.className = "module-l1-desc";
+
+  var t = String(text || "").trim();
+  if (!t) {
+    return wrap;
+  }
+
+  var lines = t.split(/\n+/).map(function (x) { return x.trim(); }).filter(Boolean);
+  if (!lines.length) {
+    return wrap;
+  }
+
+  var table = document.createElement("div");
+  table.className = "desc-table";
+
+  lines.forEach(function (line) {
+    var parts = line.split("：");
+    var label = parts[0] ? parts[0].trim() : "";
+    var value = parts.slice(1).join("：").trim();
+
+    var row = document.createElement("div");
+    row.className = "desc-row";
+
+    var l = document.createElement("div");
+    l.className = "desc-label";
+    l.textContent = label || "说明";
+
+    var v = document.createElement("div");
+    v.className = "desc-value";
+    v.textContent = value || line;
+
+    row.appendChild(l);
+    row.appendChild(v);
+    table.appendChild(row);
+  });
+
+  wrap.appendChild(table);
+  return wrap;
 }
 
 /**
@@ -324,10 +368,6 @@ function renderListView(items) {
     var row = document.createElement("div");
     row.className = "lv-row";
 
-    var icon = document.createElement("div");
-    icon.className = "lv-icon";
-    icon.setAttribute("aria-hidden", "true");
-
     var main = document.createElement("div");
     main.className = "lv-main";
 
@@ -396,7 +436,6 @@ function renderListView(items) {
       main.appendChild(actions);
     }
 
-    row.appendChild(icon);
     row.appendChild(main);
     ul.appendChild(row);
   });
@@ -492,3 +531,4 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 });
+
