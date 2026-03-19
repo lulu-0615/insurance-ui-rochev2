@@ -385,29 +385,28 @@ body::before {
 }
 
 .module-l1-desc {
-  white-space: pre-line;
   font-size: var(--font-16);
   color: var(--color-muted);
   max-width: 62ch;
 }
 
 .module-accordion {
-  margin-top: auto;
+  margin-top: var(--space-16);
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
 }
 
 .acc2 {
-  border: 1px solid rgba(209, 213, 219, 0.9);
+  border: 1px solid rgba(37, 99, 235, 0.18);
   border-radius: var(--radius-md);
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(37, 99, 235, 0.06);
   overflow: hidden;
 }
 
 .theme-dark .acc2 {
-  background-color: rgba(15, 23, 42, 0.9);
-  border-color: rgba(31, 41, 55, 0.9);
+  background-color: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.22);
 }
 
 .acc2-summary {
@@ -488,15 +487,16 @@ details[open] > .acc2-summary::after {
 .seg-btn {
   position: relative;
   z-index: 1;
-  height: 32px;
-  padding: 0 var(--space-12);
+  min-height: 32px;
+  padding: var(--space-4) var(--space-12);
   border-radius: 999px;
   border: 0;
   background: transparent;
   color: var(--color-muted);
   font-size: var(--font-12);
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.2;
 }
 
 .seg-btn.active {
@@ -538,44 +538,70 @@ details[open] > .acc2-summary::after {
 }
 
 .lv-row {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
-  gap: var(--space-12);
-  align-items: start;
-}
-
-.lv-icon {
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  background-color: rgba(37, 99, 235, 0.16);
-  border: 1px solid rgba(37, 99, 235, 0.22);
+  display: block;
 }
 
 .lv-top {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-12);
+  flex-wrap: wrap;
 }
 
 .lv-title {
   font-size: var(--font-14);
   font-weight: 650;
   color: var(--color-text);
+  flex: 1 1 100%;
 }
 
 .lv-right {
   font-size: var(--font-12);
   color: var(--color-muted);
-  white-space: nowrap;
+  white-space: normal;
   flex: none;
+  margin-left: auto;
 }
 
 .lv-subtitle {
   margin-top: var(--space-4);
   font-size: var(--font-12);
   color: var(--color-muted);
+}
+
+/* 一级解释：左标签右内容（轻量、浅灰、不强调） */
+.desc-table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.desc-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: var(--space-12);
+  align-items: start;
+}
+
+.desc-label {
+  font-size: var(--font-12);
+  color: rgba(55, 65, 81, 0.55);
+  font-weight: 650;
+}
+
+.theme-dark .desc-label {
+  color: rgba(156, 163, 175, 0.65);
+}
+
+.desc-value {
+  font-size: var(--font-12);
+  color: rgba(55, 65, 81, 0.55);
+  line-height: 1.6;
+}
+
+.theme-dark .desc-value {
+  color: rgba(156, 163, 175, 0.65);
 }
 
 .lv-bullets {
@@ -1299,4 +1325,3 @@ a:hover {
   color: var(--color-muted);
   font-size: var(--font-12);
 }
-
