@@ -1,58 +1,49 @@
-/**
- * @typedef {Object} InsuranceBranchDrug
- * @property {string} drug_name
- * @property {string} [condition]
- * @property {string} [validity]
- */
 
 /**
- * @typedef {Object} InsuranceBranch
+ * @typedef {Object} AppListItem
+ * @property {string} id
  * @property {string} title
- * @property {string} [description]
- * @property {string} [content]
- * @property {Array<string>} [links]
- * @property {Record<string, any>} [content_detail]
+ * @property {string} [subtitle]
+ * @property {Array<string>} [bullets]
+ * @property {Array<string>} [tips]
+ * @property {string} [right]
+ * @property {string} [link]
+ * @property {"open"|"copy"} [link_kind]
  */
 
 /**
- * @typedef {Object} InsuranceModule
- * @property {string} insurance_type
- * @property {Record<string, string>} [summary]
- * @property {Array<InsuranceBranch>} sub_branches
+ * @typedef {Object} AppTab
+ * @property {string} id
+ * @property {string} title
+ * @property {Array<AppListItem>} items
+ */
+
+/**
+ * @typedef {Object} AppAccordionItem
+ * @property {string} id
+ * @property {string} title
+ * @property {string} [subtitle]
+ * @property {Array<AppTab>} tabs
+ */
+
+/**
+ * @typedef {Object} AppModule
+ * @property {string} id
+ * @property {string} title
+ * @property {string} description
+ * @property {Array<AppAccordionItem>} accordion
  */
 
 /**
  * @typedef {Object} InsuranceConfigRoot
  * @property {string} main_title
- * @property {Array<InsuranceModule>} insurance_data
+ * @property {Array<AppModule>} modules
  */
 
-/**
- * 安全转义 HTML
- * @param {string} str
- * @returns {string}
- */
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-/**
- * 生成稳定 DOM id（用于滚动定位）
- * @param {string} input
- * @returns {string}
- */
-function slugify(input) {
-  return String(input || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[\s/]+/g, "-")
-    .replace(/[^\u4e00-\u9fa5a-z0-9\-]+/g, "")
-    .slice(0, 80) || "section";
-}
+/** @type {InsuranceConfigRoot | null} */
+var cachedConfig = null;
+/** @type {boolean} */
+var pendingShowModules = false;
 
 /**
  * 平滑滚动到元素
@@ -99,7 +90,7 @@ function initThemeToggle() {
 }
 
 /**
- * 初始化 Hero CTA
+ * 初始化 Hero CTA：点击后才渲染卡片
  * @returns {void}
  */
 function initHeroCta() {
@@ -110,7 +101,7 @@ function initHeroCta() {
   btn.addEventListener("click", function () {
     pendingShowModules = true;
     if (cachedConfig) {
-      renderModules(cachedConfig.insurance_data || []);
+      renderModules(cachedConfig.modules || []);
     }
     scrollToId("features");
   });
@@ -129,25 +120,20 @@ function initFooterYear() {
 }
 
 /**
- * 渲染顶部标题
+ * 渲染 Hero 标题
  * @param {InsuranceConfigRoot} cfg
  * @returns {void}
  */
 function renderHero(cfg) {
   var titleEl = document.getElementById("tool-title");
-  var subtitleEl = document.getElementById("tool-subtitle");
   if (titleEl) {
     titleEl.textContent = cfg.main_title || "多层次保障科普小工具";
-  }
-  if (subtitleEl) {
-    // Hero 下的解释文案：保持克制（可后续做成 JSON 字段）
-    subtitleEl.textContent = subtitleEl.textContent || "";
   }
 }
 
 /**
- * 渲染所有二级模块 sections（3 大模块）
- * @param {Array<InsuranceModule>} modules
+ * 渲染所有一级模块卡片
+ * @param {Array<AppModule>} modules
  * @returns {void}
  */
 function renderModules(modules) {
@@ -158,368 +144,287 @@ function renderModules(modules) {
   root.innerHTML = "";
 
   modules.forEach(function (mod) {
-    root.appendChild(renderModuleCard(mod));
+    root.appendChild(renderAppModuleCard(mod));
   });
 }
 
 /**
- * 二级模块配图占位（你后续可替换 assets 或扩展 JSON 字段）
- * @param {string} insuranceType
- * @returns {string}
- */
-function getModuleImage(insuranceType) {
-  if (insuranceType.indexOf("居民") !== -1) {
-    return "./assets/basic-medical.svg";
-  }
-  if (insuranceType.indexOf("惠民") !== -1) {
-    return "./assets/hui-min-bao.svg";
-  }
-  return "./assets/commercial-insurance.svg";
-}
-
-/**
- * 获取模块风格 class（用于不同渐变/强调色）
- * @param {string} insuranceType
- * @returns {string}
- */
-function getModuleClass(insuranceType) {
-  if (insuranceType.indexOf("居民") !== -1) {
-    return "module--basic";
-  }
-  if (insuranceType.indexOf("惠民") !== -1) {
-    return "module--hmb";
-  }
-  return "module--commercial";
-}
-
-/**
- * 将 summary 对象格式化为“少量要点”，便于扫读
- * @param {Record<string, string> | undefined} summary
- * @returns {Array<{label: string, text: string}>}
- */
-function formatSummary(summary) {
-  if (!summary) {
-    return [];
-  }
-  var preferred = ["作用", "亮点", "局限"];
-  /** @type {Array<{label: string, text: string}>} */
-  var pairs = [];
-
-  preferred.forEach(function (k) {
-    if (summary[k]) {
-      pairs.push({ label: k, text: String(summary[k]) });
-    }
-  });
-
-  // 补齐其它字段（最多 3 条）
-  Object.keys(summary).forEach(function (k) {
-    if (preferred.indexOf(k) !== -1) {
-      return;
-    }
-    if (pairs.length >= 3) {
-      return;
-    }
-    if (summary[k]) {
-      pairs.push({ label: k, text: String(summary[k]) });
-    }
-  });
-
-  return pairs.slice(0, 3);
-}
-
-/**
- * 渲染 summary 为两到三行要点（带行数截断）
- * @param {Array<{label: string, text: string}>} pairs
+ * 一级：模块卡片
+ * @param {AppModule} mod
  * @returns {HTMLElement}
  */
-function renderSummaryBlock(pairs) {
-  var wrap = document.createElement("div");
-  wrap.className = "module-summary";
-
-  if (!pairs.length) {
-    return wrap;
-  }
-
-  pairs.forEach(function (p) {
-    var row = document.createElement("div");
-    row.className = "summary-row";
-
-    var label = document.createElement("span");
-    label.className = "summary-label";
-    label.textContent = p.label;
-
-    var text = document.createElement("span");
-    text.className = "summary-text";
-    text.textContent = p.text;
-
-    row.appendChild(label);
-    row.appendChild(text);
-    wrap.appendChild(row);
-  });
-
-  return wrap;
-}
-
-/**
- * 渲染单个二级模块 section
- * @param {InsuranceModule} mod
- * @returns {HTMLElement}
- */
-function renderModuleCard(mod) {
+function renderAppModuleCard(mod) {
   var card = document.createElement("section");
-  card.className = "card module " + getModuleClass(mod.insurance_type);
-
-  var actions = document.createElement("div");
-  actions.className = "module-actions";
+  card.className = "card module";
 
   var header = document.createElement("div");
-  header.className = "module-header";
+  header.className = "module-header module-header-centered";
 
   var title = document.createElement("h2");
-  title.className = "module-title";
-  title.textContent = mod.insurance_type;
+  title.className = "module-title module-title-centered";
+  title.textContent = mod.title;
 
-  var summary = renderSummaryBlock(formatSummary(mod.summary));
+  var desc = document.createElement("div");
+  desc.className = "module-l1-desc";
+  desc.textContent = mod.description || "";
 
   header.appendChild(title);
-  header.appendChild(summary);
-
-  // 子分支按钮（sub_branches.title）
-  (mod.sub_branches || []).forEach(function (branch) {
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "linkish";
-
-    var left = document.createElement("span");
-    left.textContent = branch.title;
-
-    var right = document.createElement("small");
-    right.textContent = "点击查看";
-
-    btn.appendChild(left);
-    btn.appendChild(right);
-
-    btn.addEventListener("click", function () {
-      var panel = card.querySelector("[data-branch-panel='1']");
-      var all = actions.querySelectorAll(".linkish");
-
-      var isActive = btn.classList.contains("active");
-      if (isActive && panel) {
-        all.forEach(function (x) {
-          x.classList.remove("active");
-        });
-        panel.hidden = true;
-        panel.innerHTML = "";
-        panel.removeAttribute("data-current-branch");
-        return;
-      }
-
-      all.forEach(function (x) {
-        x.classList.remove("active");
-      });
-      btn.classList.add("active");
-      renderBranchPanel(card, mod, branch);
-    });
-
-    actions.appendChild(btn);
-  });
-
+  header.appendChild(desc);
   card.appendChild(header);
-  card.appendChild(actions);
 
-  var bottomLink = document.createElement("a");
-  bottomLink.className = "module-link";
-  bottomLink.href = "javascript:void(0)";
-  bottomLink.textContent = "查看该模块内容 →";
-  bottomLink.addEventListener("click", function (e) {
-    e.preventDefault();
-    var first = actions.querySelector(".linkish");
-    if (first) {
-      first.click();
-    }
+  var acc = document.createElement("div");
+  acc.className = "module-accordion";
+
+  (mod.accordion || []).forEach(function (a) {
+    acc.appendChild(renderAccordionItem(a));
   });
-  card.appendChild(bottomLink);
 
-  var panel = document.createElement("div");
-  panel.className = "branch-panel";
-  panel.hidden = true;
-  panel.setAttribute("data-branch-panel", "1");
-  card.appendChild(panel);
-
+  card.appendChild(acc);
   return card;
 }
 
 /**
- * 在模块卡片内渲染“子分支详情面板”（三级标题点开后显示）
- * @param {HTMLElement} card
- * @param {InsuranceModule} mod
- * @param {InsuranceBranch} branch
- * @returns {void}
+ * 二级：手风琴条目（details）
+ * @param {AppAccordionItem} item
+ * @returns {HTMLElement}
  */
-function renderBranchPanel(card, mod, branch) {
-  var panel = card.querySelector("[data-branch-panel='1']");
-  if (!panel) {
-    return;
-  }
-  panel.setAttribute("data-current-branch", slugify(branch.title));
-  panel.innerHTML = "";
-  panel.hidden = false;
+function renderAccordionItem(item) {
+  var d = document.createElement("details");
+  d.className = "acc2";
 
-  var h = document.createElement("h3");
-  h.className = "branch-title";
-  h.textContent = branch.title;
-  panel.appendChild(h);
+  var s = document.createElement("summary");
+  s.className = "acc2-summary";
 
-  if (branch.description) {
-    var p = document.createElement("p");
-    p.className = "text";
-    p.textContent = branch.description;
-    panel.appendChild(p);
-  }
+  var left = document.createElement("div");
+  left.className = "acc2-left";
 
-  if (branch.content) {
-    // 惠民保“是什么”内容：做成结构化分块（定义/举例/共同特点/总结）
-    if (String(branch.title || "").indexOf("惠民保是什么") !== -1) {
-      panel.appendChild(renderHuiMinBaoIntro(String(branch.content)));
-    } else {
-      panel.appendChild(renderTextWithCtas(branch.content));
-    }
+  var t = document.createElement("div");
+  t.className = "acc2-title";
+  t.textContent = item.title;
+  left.appendChild(t);
+
+  if (item.subtitle) {
+    var sub = document.createElement("div");
+    sub.className = "acc2-subtitle";
+    sub.textContent = item.subtitle;
+    left.appendChild(sub);
   }
 
-  if (branch.links && branch.links.length) {
-    panel.appendChild(renderBranchLinks(branch.links));
-  }
+  s.appendChild(left);
+  d.appendChild(s);
 
-  if (branch.content_detail && typeof branch.content_detail === "object") {
-    var keys = Object.keys(branch.content_detail);
-    if (keys.length) {
-      /** @type {Array<{key: string, label: string}>} */
-      var items = keys.map(function (k) {
-        var v = branch.content_detail[k];
-        var label = k;
-        if (v && typeof v === "object" && "header" in v && v.header) {
-          label = String(v.header);
-        } else if (/^part\d+$/i.test(k)) {
-          label = "内容";
-        }
-        return { key: k, label: label };
-      });
+  var body = document.createElement("div");
+  body.className = "acc2-body";
+  body.appendChild(renderMobileServiceCard(item));
+  d.appendChild(body);
 
-      var row = document.createElement("div");
-      row.className = "pill-row";
-
-      var content = document.createElement("div");
-      content.className = "block";
-      content.setAttribute("data-detail-content", "1");
-
-      items.forEach(function (it, idx) {
-        var b = document.createElement("button");
-        b.type = "button";
-        b.className = "pill-btn" + (idx === 0 ? " active" : "");
-        b.textContent = it.label;
-        b.addEventListener("click", function () {
-          var all = row.querySelectorAll(".pill-btn");
-          all.forEach(function (x) {
-            x.classList.remove("active");
-          });
-          b.classList.add("active");
-          content.innerHTML = "";
-          content.appendChild(renderValue(branch.content_detail[it.key]));
-        });
-        row.appendChild(b);
-      });
-
-      // 默认展示第一个
-      content.appendChild(renderValue(branch.content_detail[items[0].key]));
-
-      panel.appendChild(row);
-      panel.appendChild(content);
-    }
-  }
+  return d;
 }
 
 /**
- * 将 links 渲染成“按钮跳转/复制”，避免直接露出网址
- * @param {Array<string>} links
+ * 三级：移动端服务组件卡片（segmented + swiper + dots）
+ * @param {AppAccordionItem} item
  * @returns {HTMLElement}
  */
-function renderBranchLinks(links) {
+function renderMobileServiceCard(item) {
   var wrap = document.createElement("div");
-  wrap.className = "link-grid";
+  wrap.className = "svc-card";
 
-  links.forEach(function (raw) {
-    var parsed = parseLinkLine(raw);
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "link-btn";
+  var header = document.createElement("div");
+  header.className = "svc-header";
 
-    var left = document.createElement("span");
-    left.className = "link-btn-title";
-    left.textContent = parsed.label || "跳转";
+  var seg = document.createElement("div");
+  seg.className = "segmented";
 
-    var right = document.createElement("small");
-    right.className = "link-btn-meta";
-    right.textContent = parsed.kind === "open" ? "打开" : parsed.kind === "copy" ? "复制" : "待补充";
+  var indicator = document.createElement("div");
+  indicator.className = "seg-indicator";
+  seg.appendChild(indicator);
 
-    btn.appendChild(left);
-    btn.appendChild(right);
+  var track = document.createElement("div");
+  track.className = "carousel";
+  track.setAttribute("role", "region");
+  track.setAttribute("aria-label", "内容分页");
 
-    if (parsed.kind === "open" && parsed.target) {
-      btn.addEventListener("click", function () {
-        window.open(parsed.target, "_blank", "noopener,noreferrer");
-      });
-    } else if (parsed.kind === "copy" && parsed.target) {
-      btn.addEventListener("click", function () {
-        copyToClipboard(parsed.target).then(function () {
-          right.textContent = "已复制";
-          window.setTimeout(function () {
-            right.textContent = "复制";
-          }, 1200);
-        });
-      });
-    } else {
-      btn.disabled = true;
-      btn.classList.add("is-disabled");
-    }
+  var dots = document.createElement("div");
+  dots.className = "dots";
 
-    wrap.appendChild(btn);
+  var tabs = item.tabs || [];
+  var tabButtons = [];
+  var dotEls = [];
+
+  tabs.forEach(function (tab, idx) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "seg-btn" + (idx === 0 ? " active" : "");
+    b.textContent = tab.title;
+    b.addEventListener("click", function () {
+      scrollCarouselTo(track, idx);
+      setActiveIndex(idx);
+    });
+    tabButtons.push(b);
+    seg.appendChild(b);
+
+    var page = document.createElement("div");
+    page.className = "carousel-page";
+    page.appendChild(renderListView(tab.items || []));
+    track.appendChild(page);
+
+    var dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "dot" + (idx === 0 ? " active" : "");
+    dot.addEventListener("click", function () {
+      scrollCarouselTo(track, idx);
+      setActiveIndex(idx);
+    });
+    dotEls.push(dot);
+    dots.appendChild(dot);
   });
 
+  function setActiveIndex(idx) {
+    tabButtons.forEach(function (x, i) {
+      x.classList.toggle("active", i === idx);
+    });
+    dotEls.forEach(function (x, i) {
+      x.classList.toggle("active", i === idx);
+    });
+    if (tabButtons[idx]) {
+      positionIndicator(indicator, tabButtons[idx]);
+    }
+  }
+
+  track.addEventListener("scroll", function () {
+    var idx = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+    idx = Math.min(Math.max(idx, 0), tabs.length - 1);
+    setActiveIndex(idx);
+  }, { passive: true });
+
+  window.setTimeout(function () {
+    if (tabButtons[0]) {
+      positionIndicator(indicator, tabButtons[0]);
+    }
+  }, 0);
+
+  header.appendChild(seg);
+  wrap.appendChild(header);
+  wrap.appendChild(track);
+  wrap.appendChild(dots);
   return wrap;
 }
 
 /**
- * 解析类似 “[1]. 上海：#小程序://xxx” 或 “杭州：https://...” 的行
- * @param {string} line
- * @returns {{label: string, kind: "open"|"copy"|"none", target: string}}
+ * 四级：list view（圆形图标 + 主标题 + 副标题 + 右侧文本）
+ * @param {Array<AppListItem>} items
+ * @returns {HTMLElement}
  */
-function parseLinkLine(line) {
-  var text = String(line || "").trim();
-  text = text.replace(/^\[\d+\]\.\s*/, "").replace(/^\(\d+\)\s*/, "");
+function renderListView(items) {
+  var ul = document.createElement("div");
+  ul.className = "listview";
 
-  var label = text;
-  var target = "";
+  items.forEach(function (it) {
+    var row = document.createElement("div");
+    row.className = "lv-row";
 
-  // 优先按中文冒号切分
-  var parts = text.split("：");
-  if (parts.length >= 2) {
-    label = parts[0].trim();
-    target = parts.slice(1).join("：").trim();
-  }
+    var icon = document.createElement("div");
+    icon.className = "lv-icon";
+    icon.setAttribute("aria-hidden", "true");
 
-  var http = (target || text).match(/https?:\/\/[^\s)]+/);
-  if (http && http[0]) {
-    return { label: label, kind: "open", target: http[0] };
-  }
+    var main = document.createElement("div");
+    main.className = "lv-main";
 
-  // 小程序 schema（浏览器无法直接打开，改为复制）
-  var mini = (target || text).match(/#小程序:\/\/[^\s)]+/);
-  if (mini && mini[0]) {
-    return { label: label, kind: "copy", target: mini[0] };
-  }
+    var top = document.createElement("div");
+    top.className = "lv-top";
 
-  // 没有可用链接
-  return { label: label, kind: "none", target: "" };
+    var title = document.createElement("div");
+    title.className = "lv-title";
+    title.textContent = it.title;
+    top.appendChild(title);
+
+    if (it.right) {
+      var right = document.createElement("div");
+      right.className = "lv-right";
+      right.textContent = it.right;
+      top.appendChild(right);
+    }
+
+    main.appendChild(top);
+
+    if (it.subtitle) {
+      var sub = document.createElement("div");
+      sub.className = "lv-subtitle";
+      sub.textContent = it.subtitle;
+      main.appendChild(sub);
+    }
+
+    if (it.bullets && it.bullets.length) {
+      var bl = document.createElement("ul");
+      bl.className = "lv-bullets";
+      it.bullets.forEach(function (b) {
+        var li = document.createElement("li");
+        li.textContent = b;
+        bl.appendChild(li);
+      });
+      main.appendChild(bl);
+    }
+
+    if (it.tips && it.tips.length) {
+      var tips = document.createElement("div");
+      tips.className = "lv-tips";
+      it.tips.forEach(function (t) {
+        var p = document.createElement("div");
+        p.className = "lv-tip";
+        p.textContent = t;
+        tips.appendChild(p);
+      });
+      main.appendChild(tips);
+    }
+
+    if (it.link) {
+      var actions = document.createElement("div");
+      actions.className = "lv-actions";
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "lv-link";
+      btn.textContent = it.link_kind === "copy" ? "复制链接" : "打开链接";
+      btn.addEventListener("click", function () {
+        if (it.link_kind === "copy") {
+          copyToClipboard(it.link || "");
+        } else {
+          window.open(it.link, "_blank", "noopener,noreferrer");
+        }
+      });
+      actions.appendChild(btn);
+      main.appendChild(actions);
+    }
+
+    row.appendChild(icon);
+    row.appendChild(main);
+    ul.appendChild(row);
+  });
+
+  return ul;
+}
+
+/**
+ * carousel 滚动到指定页
+ * @param {HTMLElement} track
+ * @param {number} idx
+ * @returns {void}
+ */
+function scrollCarouselTo(track, idx) {
+  track.scrollTo({ left: idx * track.clientWidth, behavior: "smooth" });
+}
+
+/**
+ * indicator 对齐到当前 segmented 按钮
+ * @param {HTMLElement} indicator
+ * @param {HTMLElement} btn
+ * @returns {void}
+ */
+function positionIndicator(indicator, btn) {
+  var rect = btn.getBoundingClientRect();
+  var parentRect = btn.parentElement ? btn.parentElement.getBoundingClientRect() : rect;
+  indicator.style.width = rect.width + "px";
+  indicator.style.transform = "translateX(" + (rect.left - parentRect.left) + "px)";
 }
 
 /**
@@ -550,704 +455,6 @@ function copyToClipboard(text) {
 }
 
 /**
- * 把包含 URL 的文本渲染为 “文本 + CTA 按钮”
- * @param {string} text
- * @returns {HTMLElement}
- */
-function renderTextWithCtas(text) {
-  var wrap = document.createElement("div");
-
-  var urls = extractUrls(text);
-  var clean = text;
-  urls.forEach(function (u) {
-    clean = clean.replace(u, "").replace(/\s{2,}/g, " ").trim();
-  });
-
-  if (clean) {
-    var p = document.createElement("p");
-    p.className = "text";
-    p.textContent = clean;
-    wrap.appendChild(p);
-  }
-
-  urls.forEach(function (u) {
-    var a = document.createElement("a");
-    a.className = "cta";
-    a.href = u;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.textContent = guessCtaLabel(clean) || "打开链接";
-    wrap.appendChild(a);
-  });
-
-  if (!clean && !urls.length) {
-    var p2 = document.createElement("p");
-    p2.className = "text";
-    p2.textContent = text;
-    wrap.appendChild(p2);
-  }
-
-  return wrap;
-}
-
-/**
- * 猜测 CTA 按钮文案（尽量贴近医疗/咨询语境）
- * @param {string} context
- * @returns {string}
- */
-function guessCtaLabel(context) {
-  var t = String(context || "");
-  if (t.indexOf("咨询") !== -1 || t.indexOf("入口") !== -1) {
-    return "咨询入口";
-  }
-  if (t.indexOf("下载") !== -1) {
-    return "下载";
-  }
-  if (t.indexOf("官网") !== -1) {
-    return "打开官网";
-  }
-  return "打开链接";
-}
-
-/**
- * 从字符串中提取 URL（http/https）
- * @param {string} text
- * @returns {Array<string>}
- */
-function extractUrls(text) {
-  var m = String(text || "").match(/https?:\/\/[^\s)]+/g);
-  return m ? Array.from(new Set(m)) : [];
-}
-
-/** @type {InsuranceConfigRoot | null} */
-var cachedConfig = null;
-/** @type {boolean} */
-var pendingShowModules = false;
-
-/**
- * 惠民保“是什么”结构化展示：定义 → 举例 → 共同特点 → 总结
- * @param {string} text
- * @returns {HTMLElement}
- */
-function renderHuiMinBaoIntro(text) {
-  var t = String(text || "").trim();
-  var wrap = document.createElement("div");
-  wrap.className = "info-blocks";
-
-  // 1) 定义：第一句（到第一个句号）
-  var firstDot = t.indexOf("。");
-  var definition = firstDot !== -1 ? t.slice(0, firstDot + 1) : t;
-  var rest = firstDot !== -1 ? t.slice(firstDot + 1) : "";
-
-  // 2) 举例：包含“比如”的句子
-  var example = "";
-  var exMatch = rest.match(/比如[^。]*。/);
-  if (exMatch && exMatch[0]) {
-    example = exMatch[0];
-    rest = rest.replace(exMatch[0], "");
-  }
-
-  // 3) 共同特点：包含“共同特点”的部分
-  var features = "";
-  var featIdx = rest.indexOf("共同特点");
-  if (featIdx !== -1) {
-    features = rest.slice(featIdx);
-    rest = rest.slice(0, featIdx);
-  }
-
-  // 4) 总结：最后一句
-  var summary = "";
-  var lastDot = features.lastIndexOf("。");
-  if (lastDot !== -1) {
-    summary = features.slice(lastDot).trim();
-    features = features.slice(0, lastDot).trim();
-  }
-  if (!summary) {
-    var last = t.match(/[^。]*。$/);
-    summary = last ? last[0] : "";
-  }
-
-  wrap.appendChild(renderInfoBlock("定义", definition));
-  if (example) {
-    wrap.appendChild(renderInfoBlock("举例", example));
-  }
-  if (features) {
-    wrap.appendChild(renderFeaturesBlock(features));
-  }
-
-  return wrap;
-}
-
-/**
- * 渲染一个“信息块”
- * @param {string} title
- * @param {string} body
- * @returns {HTMLElement}
- */
-function renderInfoBlock(title, body) {
-  var block = document.createElement("div");
-  block.className = "info-block";
-
-  var h = document.createElement("div");
-  h.className = "info-title";
-  h.textContent = title;
-
-  var p = document.createElement("div");
-  p.className = "info-text";
-  p.textContent = String(body || "").trim();
-
-  block.appendChild(h);
-  block.appendChild(p);
-  return block;
-}
-
-/**
- * 渲染“共同特点”块：把“几乎零门槛：...” “价格非常亲民：...” 拆成两条
- * @param {string} text
- * @returns {HTMLElement}
- */
-function renderFeaturesBlock(text) {
-  var block = document.createElement("div");
-  block.className = "info-block";
-
-  var h = document.createElement("div");
-  h.className = "info-title";
-  h.textContent = "共同特点";
-  block.appendChild(h);
-
-  // 尝试按分号拆
-  var items = text.split(/；/).map(function (x) { return x.trim(); }).filter(Boolean);
-  var ul = document.createElement("ul");
-  ul.className = "list";
-  items.forEach(function (it) {
-    // 去掉前导“共同特点：”
-    it = it.replace(/^.*共同特点：?/, "").trim();
-    if (!it) {
-      return;
-    }
-    var li = document.createElement("li");
-    li.textContent = it;
-    ul.appendChild(li);
-  });
-  block.appendChild(ul);
-  return block;
-}
-
-/**
- * 渲染三级标题手风琴（sub_branches）
- * @param {InsuranceModule} mod
- * @returns {HTMLElement}
- */
-// 已由“卡片 + 子分支按钮 + 类型 pills”取代旧的手风琴渲染
-
-/**
- * 渲染单个四级条目（details/summary）
- * @param {string} title
- * @param {any} value
- * @returns {HTMLElement}
- */
-function renderDetailItem(title, value) {
-  var details = document.createElement("details");
-  details.className = "acc-item acc-item-4";
-
-  var summary = document.createElement("summary");
-  summary.className = "acc-summary acc-summary-4";
-
-  var h4 = document.createElement("div");
-  h4.className = "acc-title h4";
-  h4.textContent = title;
-
-  summary.appendChild(h4);
-  details.appendChild(summary);
-
-  var body = document.createElement("div");
-  body.className = "acc-body acc-body-4";
-  body.appendChild(renderValue(value));
-
-  details.appendChild(body);
-  return details;
-}
-
-/**
- * 根据 value 类型渲染内容（DOM）
- * @param {any} value
- * @returns {HTMLElement}
- */
-function renderValue(value) {
-  if (value == null) {
-    var empty = document.createElement("p");
-    empty.className = "text";
-    empty.textContent = "暂无内容。";
-    return empty;
-  }
-
-  if (typeof value === "string") {
-    return renderNumberedText(value);
-  }
-
-  if (Array.isArray(value)) {
-    // 数组：可能是药品对象数组，或字符串数组
-    if (value.length && typeof value[0] === "object" && value[0]) {
-      // 试图识别药品列表结构
-      if ("drug_name" in value[0]) {
-        return renderDrugTable(/** @type {Array<InsuranceBranchDrug>} */ (value));
-      }
-      // 识别条件列表（name/text）
-      if ("name" in value[0] && "text" in value[0]) {
-        return renderNestedAccordionFromNamedText(value);
-      }
-    }
-
-    // 普通字符串数组
-    var allStrings = value.every(function (item) {
-      return typeof item === "string";
-    });
-
-    if (allStrings && shouldRenderAsProductCards(/** @type {Array<string>} */ (value))) {
-      return renderProductCardsFromStrings(/** @type {Array<string>} */ (value));
-    }
-
-    var ul = document.createElement("ul");
-    ul.className = "list";
-    value.forEach(function (item) {
-      var li = document.createElement("li");
-      li.textContent = typeof item === "string" ? item : JSON.stringify(item);
-      ul.appendChild(li);
-    });
-    return ul;
-  }
-
-  if (typeof value === "object") {
-    // 对象：可能是 {header,text}, {header,conditions/strategies}, 或任意分段 part1/part2
-    if ("header" in value) {
-      return renderHeaderObject(value);
-    }
-    // 多段 partX：用更深一层手风琴（仍然点击展开）
-    return renderContentDetailAccordion(value);
-  }
-
-  var fallback = document.createElement("p");
-  fallback.className = "text";
-  fallback.textContent = String(value);
-  return fallback;
-}
-
-/**
- * 渲染药品表格
- * @param {Array<InsuranceBranchDrug>} drugs
- * @returns {HTMLElement}
- */
-function renderDrugTable(drugs) {
-  var table = document.createElement("table");
-  table.innerHTML =
-    "<thead><tr><th>药品</th><th>适用/条件</th><th>有效期</th></tr></thead><tbody></tbody>";
-  var tbody = table.querySelector("tbody");
-  if (!tbody) {
-    return table;
-  }
-
-  drugs.forEach(function (d) {
-    var tr = document.createElement("tr");
-    var td1 = document.createElement("td");
-    td1.textContent = d.drug_name || "";
-
-    var td2 = document.createElement("td");
-    td2.innerHTML = formatConditionHtml(d.condition);
-
-    var td3 = document.createElement("td");
-    td3.textContent = d.validity || "";
-
-    tr.appendChild(td1);
-    tr.appendChild(td2);
-    tr.appendChild(td3);
-    tbody.appendChild(tr);
-  });
-
-  return table;
-}
-
-/**
- * 渲染 {header,text/conditions/strategies} 这类对象
- * @param {any} obj
- * @returns {HTMLElement}
- */
-function renderHeaderObject(obj) {
-  var wrap = document.createElement("div");
-
-  var title = document.createElement("div");
-  title.className = "block-title";
-  title.textContent = obj.header || "";
-  wrap.appendChild(title);
-
-  if (obj.text) {
-    // 针对“什么叫医保报销”：把个人账户/统筹账户拆成两条，避免一整段
-    if (String(obj.header || "").indexOf("什么叫医保报销") !== -1) {
-      wrap.appendChild(renderAccountSplitText(String(obj.text)));
-    } else {
-      wrap.appendChild(renderNumberedText(String(obj.text)));
-    }
-  }
-
-  if (obj.conditions && Array.isArray(obj.conditions)) {
-    wrap.appendChild(renderNestedAccordionFromNamedText(obj.conditions));
-  }
-
-  if (obj.strategies && Array.isArray(obj.strategies)) {
-    wrap.appendChild(renderStrategiesCompact(obj.strategies));
-  }
-
-  return wrap;
-}
-
-/**
- * 将“个人账户… 统筹账户…”拆成两条说明
- * @param {string} text
- * @returns {HTMLElement}
- */
-function renderAccountSplitText(text) {
-  var t = String(text || "").trim();
-  var wrap = document.createElement("div");
-
-  // 尝试提取个人账户/统筹账户两段
-  var idxA = t.indexOf("个人账户");
-  var idxB = t.indexOf("统筹账户");
-  if (idxA !== -1 && idxB !== -1 && idxB > idxA) {
-    var a = t.slice(idxA, idxB).trim();
-    var b = t.slice(idxB).trim();
-
-    var ul = document.createElement("ul");
-    ul.className = "list";
-
-    [a, b].forEach(function (seg) {
-      var li = document.createElement("li");
-      li.appendChild(renderNumberedText(seg));
-      ul.appendChild(li);
-    });
-
-    wrap.appendChild(ul);
-    return wrap;
-  }
-
-  // fallback：正常渲染
-  wrap.appendChild(renderNumberedText(t));
-  return wrap;
-}
-
-/**
- * 将 strategies 渲染为“要点标题 + 点击展开详情”，减少首屏字数
- * @param {Array<string>} strategies
- * @returns {HTMLElement}
- */
-function renderStrategiesCompact(strategies) {
-  var container = document.createElement("div");
-  container.className = "compact-list";
-
-  strategies.forEach(function (raw) {
-    var parsed = splitTitleAndDetail(raw);
-
-    var d = document.createElement("details");
-    d.className = "compact-item";
-
-    var s = document.createElement("summary");
-    s.className = "compact-summary";
-
-    var t = document.createElement("div");
-    t.className = "compact-title";
-    t.textContent = parsed.title;
-    s.appendChild(t);
-    d.appendChild(s);
-
-    var body = document.createElement("div");
-    body.className = "compact-body";
-
-    var p = document.createElement("p");
-    p.className = "text";
-    p.textContent = parsed.detail;
-    body.appendChild(p);
-
-    d.appendChild(body);
-    container.appendChild(d);
-  });
-
-  return container;
-}
-
-/**
- * 从“1.xxx：yyy”中拆分标题与详情
- * @param {string} text
- * @returns {{title: string, detail: string}}
- */
-function splitTitleAndDetail(text) {
-  var t = String(text || "").trim();
-  // 去掉前缀编号（1. / 1、 / 1)）
-  t = t.replace(/^\s*\d+[\.\、\)]\s*/, "");
-  var parts = t.split("：");
-  if (parts.length >= 2) {
-    var title = parts[0].trim();
-    var detail = parts.slice(1).join("：").trim();
-    return { title: title || "要点", detail: detail || "" };
-  }
-  // 无冒号：标题取前 18 字，全文做详情
-  var shortTitle = t.slice(0, 18) + (t.length > 18 ? "…" : "");
-  return { title: shortTitle || "要点", detail: t };
-}
-
-/**
- * 将 1）2）3） 这种条件分点渲染为列表
- * @param {string | undefined} condition
- * @returns {string}
- */
-function formatConditionHtml(condition) {
-  var text = String(condition || "").trim();
-  if (!text) {
-    return "";
-  }
-  if (text.match(/\d）/)) {
-    var parts = text.split(/\s*\d）/).filter(Boolean);
-    var items = parts.map(function (part, idx) {
-      return "<li>" + (idx + 1) + "）" + escapeHtml(part.trim()) + "</li>";
-    }).join("");
-    return "<ul class=\"list\">" + items + "</ul>";
-  }
-  return escapeHtml(text);
-}
-
-/**
- * 按编号拆成段落或列表（用于长字符串，如“专家建议”等）
- * @param {string} text
- * @returns {HTMLElement}
- */
-function renderNumberedText(text) {
-  var t = String(text || "").trim();
-
-  // 处理 PS 提示
-  var psIndex = t.indexOf("PS：");
-  var psText = "";
-  if (psIndex === -1) {
-    psIndex = t.indexOf("Ps：");
-  }
-  if (psIndex !== -1) {
-    psText = t.slice(psIndex).trim();
-    t = t.slice(0, psIndex).trim();
-  }
-
-  // 特殊处理包含 WHY？ / What？ 的说明（做成小贴士）
-  if (t.indexOf("WHY？") !== -1 || t.indexOf("What？") !== -1) {
-    var wrapWhy = document.createElement("div");
-
-    var before = t.split("WHY？")[0];
-    if (before.trim()) {
-      var pb = document.createElement("p");
-      pb.className = "text";
-      pb.textContent = before.trim();
-      wrapWhy.appendChild(pb);
-    }
-
-    var startIdx = t.indexOf("WHY？");
-    if (startIdx === -1) {
-      startIdx = t.indexOf("What？");
-    }
-    var rest = t.slice(startIdx);
-    var segs = rest.split(/(WHY？|What？)/).filter(Boolean);
-    for (var i = 0; i < segs.length; i += 2) {
-      var label = segs[i];
-      var content = segs[i + 1] || "";
-      var pLabel = document.createElement("p");
-      pLabel.className = "tip-heading";
-      pLabel.textContent = label;
-      wrapWhy.appendChild(pLabel);
-
-      if (content.trim()) {
-        // What？后面经常带 1）2）…，拆成分点
-        if (label === "What？" && content.match(/\d）/)) {
-          var parts = content.split(/\s*\d）/).filter(Boolean);
-          var ul = document.createElement("ul");
-          ul.className = "list";
-          parts.forEach(function (part, idx) {
-            var li = document.createElement("li");
-            li.textContent = (idx + 1) + "）" + part.trim();
-            ul.appendChild(li);
-          });
-          wrapWhy.appendChild(ul);
-        } else {
-          var pContent = document.createElement("p");
-          pContent.className = "text";
-          pContent.textContent = content.trim();
-          wrapWhy.appendChild(pContent);
-        }
-      }
-    }
-
-    if (psText) {
-      var psP = document.createElement("p");
-      psP.className = "tip-text";
-      psP.textContent = psText;
-      wrapWhy.appendChild(psP);
-    }
-
-    return wrapWhy;
-  }
-
-  // 检测是否存在多个编号 1. / 1、 / 1) / 1）
-  var numbered = t.match(/\d[\.、\)）]/g);
-  if (numbered && numbered.length >= 2) {
-    var intro = "";
-    var body = t;
-    var introSplit = t.split(/：/);
-    if (introSplit.length > 1) {
-      intro = introSplit[0] + "：";
-      body = introSplit.slice(1).join("：");
-    }
-
-    var parts = body.split(/\s*\d[\.、\)）]\s*/).filter(Boolean);
-    var ul = document.createElement("ul");
-    ul.className = "list";
-    parts.forEach(function (part) {
-      var li = document.createElement("li");
-      li.textContent = part.trim();
-      ul.appendChild(li);
-    });
-
-    var wrap = document.createElement("div");
-    if (intro) {
-      var p = document.createElement("p");
-      p.className = "text";
-      p.textContent = intro;
-      wrap.appendChild(p);
-    }
-    wrap.appendChild(ul);
-
-    if (psText) {
-      var psNode = document.createElement("p");
-      psNode.className = "tip-text";
-      psNode.textContent = psText;
-      wrap.appendChild(psNode);
-    }
-
-    return wrap;
-  }
-
-  var p2 = document.createElement("p");
-  p2.className = "text";
-  p2.textContent = psText ? t : t;
-  // 如果有 PS，仅在后面追加小贴士
-  if (psText) {
-    var wrapSingle = document.createElement("div");
-    wrapSingle.appendChild(p2);
-    var psNode2 = document.createElement("p");
-    psNode2.className = "tip-text";
-    psNode2.textContent = psText;
-    wrapSingle.appendChild(psNode2);
-    return wrapSingle;
-  }
-  return p2;
-}
-
-/**
- * 判断是否适合用“小卡片”展示的产品数组
- * @param {Array<string>} items
- * @returns {boolean}
- */
-function shouldRenderAsProductCards(items) {
-  if (!items.length || items.length > 8) {
-    return false;
-  }
-  // 允许部分没有“：”，只要大多数是“产品名：说明”结构或包含【】信息
-  var score = 0;
-  items.forEach(function (s) {
-    var t = String(s || "");
-    if (t.indexOf("：") !== -1 || t.indexOf("[") !== -1 || t.indexOf("【") !== -1 || t.indexOf("（") !== -1) {
-      score += 1;
-    }
-  });
-  return score >= Math.max(2, Math.ceil(items.length * 0.6));
-}
-
-/**
- * 将 ["产品名：描述", ...] 渲染为小卡片
- * @param {Array<string>} items
- * @returns {HTMLElement}
- */
-function renderProductCardsFromStrings(items) {
-  var wrap = document.createElement("div");
-  wrap.className = "product-cards";
-
-  items.forEach(function (raw) {
-    var text = String(raw || "");
-    var parts = text.split("：");
-    var title = "";
-    var desc = "";
-
-    if (parts.length >= 2) {
-      title = parts[0].trim();
-      desc = parts.slice(1).join("：").trim();
-    } else {
-      // 没有冒号：尝试从“推出的[xxx]”中提取产品名
-      var bracket = text.match(/[\[【]([^\]】]+)[\]】]/);
-      if (bracket && bracket[1]) {
-        title = bracket[1].trim();
-        desc = text.replace(bracket[0], "").trim();
-      } else {
-        // fallback：标题取前 18 字
-        title = text.slice(0, 18) + (text.length > 18 ? "…" : "");
-        desc = text;
-      }
-    }
-
-    var card = document.createElement("div");
-    card.className = "product-card";
-
-    var h = document.createElement("div");
-    h.className = "product-title";
-    h.textContent = title;
-
-    var p = document.createElement("div");
-    p.className = "product-desc";
-    p.textContent = desc;
-
-    card.appendChild(h);
-    card.appendChild(p);
-    wrap.appendChild(card);
-  });
-
-  return wrap;
-}
-
-/**
- * 把 [{name,text}] 渲染为更深一层可点开的列表（增强美观与信息密度控制）
- * @param {Array<{name: string, text: string}>} items
- * @returns {HTMLElement}
- */
-function renderNestedAccordionFromNamedText(items) {
-  var container = document.createElement("div");
-  container.className = "accordion accordion-level-5";
-
-  items.forEach(function (it) {
-    var d = document.createElement("details");
-    d.className = "acc-item acc-item-5";
-
-    var s = document.createElement("summary");
-    s.className = "acc-summary acc-summary-5";
-
-    var t = document.createElement("div");
-    t.className = "acc-title h5";
-    t.textContent = it.name || "";
-    s.appendChild(t);
-
-    d.appendChild(s);
-
-    var b = document.createElement("div");
-    b.className = "acc-body acc-body-5";
-    b.appendChild(renderNumberedText(it.text || ""));
-    d.appendChild(b);
-
-    container.appendChild(d);
-  });
-
-  return container;
-}
-
-/**
  * 加载配置并渲染页面
  * @returns {Promise<void>}
  */
@@ -1264,7 +471,7 @@ async function initApp() {
   renderHero(root);
 
   if (pendingShowModules) {
-    renderModules(root.insurance_data || []);
+    renderModules(root.modules || []);
   }
 }
 
@@ -1285,6 +492,3 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 });
-
-
-
